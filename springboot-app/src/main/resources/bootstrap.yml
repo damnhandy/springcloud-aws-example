@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: aws
+aws:
+  paramstore:
+    default-context: shared
+  secretsmanager:
+    default-context: shared

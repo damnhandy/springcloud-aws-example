@@ -1,0 +1,99 @@
+plugins {
+    id 'org.springframework.boot' version '2.4.7'
+    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+    id "org.beryx.runtime" version "1.12.5"
+    id 'java'
+    id 'maven-publish'
+}
+
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+repositories {
+    mavenCentral()
+}
+
+configurations {
+    // exclude Tomcat because we want Undertow
+    implementation.exclude module: 'spring-boot-starter-tomcat'
+    // excluding the default logback provider
+    implementation.exclude module: 'spring-boot-starter-logging'
+}
+
+dependencies {
+    implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:2.3.1")
+    implementation('io.awspring.cloud:spring-cloud-starter-aws-parameter-store-config')
+    implementation('io.awspring.cloud:spring-cloud-starter-aws-secrets-manager-config')
+    implementation('org.springframework.boot:spring-boot-starter-actuator')
+    implementation('org.springframework.boot:spring-boot-starter-jersey')
+    implementation('org.springframework.boot:spring-boot-starter-undertow')
+    implementation('org.springframework.boot:spring-boot-starter-data-jpa')
+    implementation('org.springframework.boot:spring-boot-starter-log4j2')
+    implementation('com.zaxxer:HikariCP')
+    implementation('mysql:mysql-connector-java')
+    runtimeOnly('io.micrometer:micrometer-registry-prometheus')
+    testImplementation('com.h2database:h2')
+    testImplementation('org.springframework.boot:spring-boot-starter-test')
+}
+
+mainClassName = 'com.example.awscloud.AwscloudApplication'
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.jar.enabled = true
+
+
+runtime {
+    options = ['--strip-debug',
+               '--compress', '2',
+               '--no-header-files',
+               '--no-man-pages']
+    // Because the runtime plugin is a compromise between modular JVM app and not, we need to declare
+    // which modules the application needs manually. While the suggestModules does a reasonable job at
+    // at finding a base set of modules, it often excludes modules such as jdk.crypto.ec, which you'll
+    // need to establish TLS connections. Also, when using log4j2, you'll also need java.desktop as log4j2
+    // use the java.beans package.
+    modules = [
+            'java.management',      // Needed for JMX
+            'java.management.rmi',  // Needed for JMX
+            'java.naming',          // JNDI bits
+            'java.instrument',      // Required by anything that needs to perform instrumentation
+            'java.sql',             // Needed for JDBC
+            'jdk.unsupported',      // far too many libraries still depend on classes in this module
+            'java.desktop',         // If you're using Log4J2, you need this as it uses java.beans package
+            'java.logging',         // logging
+            'jdk.security.jgss',
+            'java.security.sasl',
+            'jdk.crypto.ec',        // Needed for TLS - TLS will not work without this
+            'jdk.crypto.cryptoki',  // Needed for TLS
+            'jdk.management',       // Needed for JMX
+            'jdk.management.agent', // Needed for JMX
+            'jdk.management.jfr',   // Java Flight Recorder
+            'jdk.jdwp.agent'        // Java remote debugging
+    ]
+}
+
+tasks.runtime.doLast {
+    copy {
+        from('src/main/resources')
+        into("$buildDir/image/bin")
+    }
+}
+
+bootDistTar.dependsOn(jar)
+bootDistZip.dependsOn(jar)
+bootStartScripts.dependsOn(jar)
+installDist.dependsOn(bootJar)
+distZip.dependsOn(bootJar)
+distTar.dependsOn(bootJar)
+startScripts.dependsOn(bootJar)
+assemble.dependsOn(runtimeZip)
