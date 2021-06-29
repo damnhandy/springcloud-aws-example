@@ -1,6 +1,8 @@
 package com.example.awscloud.config;
 
 import com.example.awscloud.resources.CarResource;
+import java.util.Arrays;
+import java.util.stream.StreamSupport;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +13,6 @@ import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.MutablePropertySources;
 
-import java.util.Arrays;
-import java.util.stream.StreamSupport;
-
 /**
  * <p>
  *     Spring Configuration for Jersey
@@ -22,12 +21,12 @@ import java.util.stream.StreamSupport;
 @Configuration
 public class JerseyConfig extends ResourceConfig {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(JerseyConfig.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(JerseyConfig.class);
 
-    Environment environment;
+  Environment environment;
 
-    public JerseyConfig(Environment environment) {
-        this.environment = environment;
-        register(CarResource.class);
-    }
+  public JerseyConfig(Environment environment) {
+    this.environment = environment;
+    register(CarResource.class);
+  }
 }

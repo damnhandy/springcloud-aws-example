@@ -1,7 +1,7 @@
 package com.example.awscloud.model;
 
-import javax.persistence.AttributeConverter;
 import java.time.Year;
+import javax.persistence.AttributeConverter;
 
 /**
  * <p>
@@ -11,15 +11,15 @@ import java.time.Year;
  */
 public class YearConverter implements AttributeConverter<Year, Short> {
 
-    @Override
-    public Short convertToDatabaseColumn(Year attribute) {
-        short year = (short) attribute.getValue();
-        return year;
-    }
+  @Override
+  public Short convertToDatabaseColumn(Year attribute) {
+    short year = (short) attribute.getValue();
+    return year;
+  }
 
-    @Override
-    public Year convertToEntityAttribute(Short mysqlValue) {
-        Year year = Year.of(mysqlValue);
-        return year;
-    }
+  @Override
+  public Year convertToEntityAttribute(Short mysqlValue) {
+    Year year = Year.of(mysqlValue);
+    return year;
+  }
 }

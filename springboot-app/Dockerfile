@@ -11,7 +11,7 @@ ENV PATH ${JAVA_HOME}/bin:${PATH}
 COPY ./ /opt/project
 WORKDIR /opt/project
 RUN ./gradlew build --no-daemon
-COPY ./credentials/truststore.p12 /opt/project/build/image/truststore.p12
+
 ENV TMP_ROOT=/chroot/app
 # Install the DNF plugins so we can run dnf download
 RUN dnf install -y dnf-plugins-core
@@ -24,7 +24,7 @@ RUN rpm --root ${TMP_ROOT} --initdb
 RUN dnf download --destdir=/var/tmp redhat-release
 
 # Set the working directory
-WORKDIR  /var/tmp
+WORKDIR /var/tmp
 # Install the RHEL Release RPM
 RUN rpm --root ${TMP_ROOT} -ivh --nodeps redhat-release*rpm
 # DNF or YUM doesn't seem to work unless there is not a repo file in the
@@ -33,10 +33,10 @@ RUN rpm --root ${TMP_ROOT} -ivh --nodeps redhat-release*rpm
 RUN mkdir -p "${TMP_ROOT}/etc/yum.repos.d/"
 RUN cp -r "/etc/yum.repos.d/ubi.repo" "${TMP_ROOT}/etc/yum.repos.d/ubi.repo"
 RUN dnf --installroot=${TMP_ROOT} -y install coreutils glibc-locale-source glibc-langpack-en \
-    --releasever 8 \
-    --setopt=install_weak_deps=False \
-    --setopt=tsflags=nodocs \
-    --setopt=override_install_langs=en_US.utf8
+  --releasever 8 \
+  --setopt=install_weak_deps=False \
+  --setopt=tsflags=nodocs \
+  --setopt=override_install_langs=en_US.utf8
 
 RUN echo "LANG=C.utf8" > ${TMP_ROOT}/etc/locale.conf
 
@@ -50,12 +50,11 @@ RUN find "${TMP_ROOT}/tmp" -mindepth 1 -delete
 # Build our final container by copying the contents to /chroot/app to
 # a scratch contaner and then layering on the SpringBoot application.
 FROM scratch
-COPY --from=builder /chroot/app  /
+COPY --from=builder /chroot/app /
 COPY --from=builder --chown=appuser:appuser /opt/project/build/image/ /opt/app/
 ENV LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8 \
-    JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
+  LANGUAGE=en_US:en \
+  LC_ALL=en_US.UTF-8 \
+  JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"
 USER appuser:appuser
-ENTRYPOINT [ "/opt/app/bin/awscloud" ]
-
+ENTRYPOINT [ "/opt/app/bin/springboot-app" ]

@@ -8,9 +8,9 @@ spring:
       data-source-properties:
         serverTimezone: UTC
         sslMode: VERIFY_CA
-        trustCertificateKeyStorePassword: "${docker.secrets.truststore_password}"
+        trustCertificateKeyStorePassword: "${docker.secrets.jdbc_truststore_password}"
         trustCertificateKeyStoreType: "PKCS12"
-        trustCertificateKeyStoreUrl: "file:/opt/app/truststore.p12"
+        trustCertificateKeyStoreUrl: "file:${docker.secrets.jdbc_truststore_path}"
         fallbackToSystemTrustStore: false
         useLegacyDatetimeCode: false
         # Recommended MySQL connection settings from HikariCP

@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class AwscloudApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(AwscloudApplication.class, args);
-	}
-
+  public static void main(String[] args) {
+    SpringApplication.run(AwscloudApplication.class, args);
+  }
 }
