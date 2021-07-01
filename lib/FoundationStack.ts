@@ -1,20 +1,18 @@
 import * as cdk from "@aws-cdk/core";
-import { Construct, StackProps } from "@aws-cdk/core";
 import * as kms from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";
-import { ObjectOwnership } from "@aws-cdk/aws-s3";
 import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 
 export class FoundationStack extends cdk.Stack {
   public kmsKey: kms.IKey;
   public artifactsBucket: s3.IBucket;
 
-  constructor(scope: Construct, id: string, props: StackProps) {
+  constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
     this.kmsKey = new kms.Key(this, "DemoAppKey", {
       enableKeyRotation: true,
-      alias: "alias/default"
+      alias: "alias/DemoAppKey"
     });
 
     this.artifactsBucket = new s3.Bucket(this, "ArtifactsBucket", {

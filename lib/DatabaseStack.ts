@@ -1,15 +1,15 @@
 import * as cdk from "@aws-cdk/core";
-import rds = require("@aws-cdk/aws-rds");
-import ssm = require("@aws-cdk/aws-ssm");
 import * as secretsmanager from "@aws-cdk/aws-secretsmanager";
 import * as ec2 from "@aws-cdk/aws-ec2";
-import * as kms from "@aws-cdk/aws-kms";
 import { VpcStack } from "./VpcStack";
 import { FoundationStack } from "./FoundationStack";
+import rds = require("@aws-cdk/aws-rds");
+import ssm = require("@aws-cdk/aws-ssm");
 
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly vpcStack: VpcStack;
   readonly foundationStack: FoundationStack;
+  readonly appName: string;
 }
 
 export class DatabaseStack extends cdk.Stack {
@@ -17,7 +17,7 @@ export class DatabaseStack extends cdk.Stack {
     super(scope, id, props);
 
     const dbAdminCreds = new secretsmanager.Secret(this, "DBAdminCreds", {
-      secretName: "/secrets/jdbc/admin",
+      secretName: `/secrets/mysql/admin`,
       encryptionKey: props.foundationStack.kmsKey,
       generateSecretString: {
         secretStringTemplate: '{\\"username\\": \\"admin\\"}',
@@ -28,18 +28,18 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     const appuserCreds = new secretsmanager.Secret(this, "AppUserCreds", {
-      secretName: "/secrets/jdbc/appuser",
+      secretName: `/secrets/${props.appName}/appuser`,
       encryptionKey: props.foundationStack.kmsKey,
       generateSecretString: {
-        secretStringTemplate: '{\\"username\\": \\"admin\\"}',
+        secretStringTemplate: '{\\"username\\": \\"appuser\\"}',
         generateStringKey: "password",
         passwordLength: 32,
         excludeCharacters: '\\"@/\\\\'
       }
     });
 
-    const mysql_cluster = new rds.DatabaseCluster(this, "MyRdsDb", {
-      defaultDatabaseName: "MyAuroraDatabase",
+    const mysql_cluster = new rds.DatabaseCluster(this, "DemoAppRdsDb", {
+      defaultDatabaseName: "DemoAppAuroraDatabase",
       storageEncryptionKey: props.foundationStack.kmsKey,
       credentials: rds.Credentials.fromSecret(dbAdminCreds),
       engine: rds.DatabaseClusterEngine.AURORA,
@@ -53,12 +53,12 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     new ssm.StringParameter(this, "HostNameSSMParam", {
-      parameterName: "/config/spring/data/jdbc/hostname",
+      parameterName: `/config/${props.appName}/spring/data/jdbc/hostname`,
       stringValue: mysql_cluster.clusterEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "PortSSMParam", {
-      parameterName: "/config/spring/data/jdbc/port",
+      parameterName: `/config/${props.appName}/spring/data/jdbc/port`,
       stringValue: mysql_cluster.clusterEndpoint.port.toString()
     });
   }
