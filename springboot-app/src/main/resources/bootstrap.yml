@@ -1,4 +1,6 @@
 spring:
+  application:
+    name: demoapp
   config:
     activate:
       on-profile: aws

@@ -15,3 +15,14 @@ fi
 
 keytool -importcert -alias MySQLCACert -file ./credentials/ca.pem -keystore \
   ./credentials/jdbc_truststore_local.p12 -storetype pkcs12 -noprompt -storepass ${truststore_passwd}
+
+if [[ -f "./credentials/jdbc_truststore_aws.p12" ]]; then
+  rm ./credentials/jdbc_truststore_aws.p12
+fi
+
+curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o ./credentials/global-bundle.pem
+
+keytool -importcert -alias AWS-RDS -file ./credentials/global-bundle.pem -keystore \
+  ./credentials/jdbc_truststore_aws.p12 -storetype pkcs12 -noprompt -storepass ${truststore_passwd}
+
+zip ./credentials/jdbc_truststore_aws.p12.zip ./credentials/jdbc_truststore_aws.p12

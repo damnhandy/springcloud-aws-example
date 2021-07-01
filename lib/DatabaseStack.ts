@@ -1,44 +1,35 @@
 import * as cdk from "@aws-cdk/core";
-import ec2 = require("@aws-cdk/aws-ec2");
-import ecs = require("@aws-cdk/aws-ecs");
-import ecs_patterns = require("@aws-cdk/aws-ecs-patterns");
-import kms = require("@aws-cdk/aws-kms");
 import rds = require("@aws-cdk/aws-rds");
 import ssm = require("@aws-cdk/aws-ssm");
 import * as secretsmanager from "@aws-cdk/aws-secretsmanager";
+import * as ec2 from "@aws-cdk/aws-ec2";
+import * as kms from "@aws-cdk/aws-kms";
+import { VpcStack } from "./VpcStack";
+import { FoundationStack } from "./FoundationStack";
 
-export class InfrastructureStack extends cdk.Stack {
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+export interface DatabaseStackProps extends cdk.StackProps {
+  readonly vpcStack: VpcStack;
+  readonly foundationStack: FoundationStack;
+}
+
+export class DatabaseStack extends cdk.Stack {
+  constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
-
-    const vpc = new ec2.Vpc(this, "Vpc", { maxAzs: 2 });
-
-    const cluster = new ecs.Cluster(this, "DemoCluster", {
-      vpc: vpc
-    });
-
-    const kms_key = new kms.Key(this, "DefaulKey", {
-      enableKeyRotation: true,
-      alias: "alias/default"
-    });
-
-    // Create a load-balanced Fargate service and make it public
-    const ecsService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, "DemoApplication", {
-      cluster: cluster,
-      cpu: 512,
-      desiredCount: 1,
-      taskImageOptions: {
-        image: ecs.ContainerImage.fromRegistry("demo/application")
-      },
-      memoryLimitMiB: 1024,
-      publicLoadBalancer: true
-    });
-
-    kms_key.grantDecrypt(ecsService.service.taskDefinition.taskRole);
 
     const dbAdminCreds = new secretsmanager.Secret(this, "DBAdminCreds", {
       secretName: "/secrets/jdbc/admin",
-      encryptionKey: kms_key,
+      encryptionKey: props.foundationStack.kmsKey,
+      generateSecretString: {
+        secretStringTemplate: '{\\"username\\": \\"admin\\"}',
+        generateStringKey: "password",
+        passwordLength: 32,
+        excludeCharacters: '\\"@/\\\\'
+      }
+    });
+
+    const appuserCreds = new secretsmanager.Secret(this, "AppUserCreds", {
+      secretName: "/secrets/jdbc/appuser",
+      encryptionKey: props.foundationStack.kmsKey,
       generateSecretString: {
         secretStringTemplate: '{\\"username\\": \\"admin\\"}',
         generateStringKey: "password",
@@ -49,12 +40,12 @@ export class InfrastructureStack extends cdk.Stack {
 
     const mysql_cluster = new rds.DatabaseCluster(this, "MyRdsDb", {
       defaultDatabaseName: "MyAuroraDatabase",
-      storageEncryptionKey: kms_key,
+      storageEncryptionKey: props.foundationStack.kmsKey,
       credentials: rds.Credentials.fromSecret(dbAdminCreds),
       engine: rds.DatabaseClusterEngine.AURORA,
       instanceProps: {
         instanceType: new ec2.InstanceType(ec2.InstanceClass.T3),
-        vpc: vpc,
+        vpc: props.vpcStack.vpc,
         vpcSubnets: {
           subnetType: ec2.SubnetType.PRIVATE
         }

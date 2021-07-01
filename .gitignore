@@ -15,7 +15,7 @@ build/
 .sts4-cache
 !**/src/main/**/bin/
 !**/src/test/**/bin/
-
+springboot-app/bin
 ### IntelliJ IDEA ###
 .idea
 *.iws

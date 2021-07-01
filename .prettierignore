@@ -5,3 +5,7 @@ coverage
 */.idea
 .idea
 cdk.out
+springboot-app/bin
+.settings/
+.vscode/
+.husky
