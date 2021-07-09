@@ -1,8 +1,8 @@
 import * as cdk from "@aws-cdk/core";
 import * as secretsmanager from "@aws-cdk/aws-secretsmanager";
 import * as ec2 from "@aws-cdk/aws-ec2";
-import { VpcStack } from "./VpcStack";
-import { FoundationStack } from "./FoundationStack";
+import { VpcStack } from "./vpc-stack";
+import { FoundationStack } from "./foundation-stack";
 import rds = require("@aws-cdk/aws-rds");
 import ssm = require("@aws-cdk/aws-ssm");
 
@@ -16,7 +16,9 @@ export class DatabaseStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
 
-    const dbAdminCreds = new secretsmanager.Secret(this, "DBAdminCreds", {
+    const prefix = "DemoAppDB";
+
+    const dbAdminCreds = new secretsmanager.Secret(this, `${prefix}AdminCreds`, {
       secretName: `/secrets/mysql/admin`,
       encryptionKey: props.foundationStack.kmsKey,
       generateSecretString: {
@@ -27,7 +29,7 @@ export class DatabaseStack extends cdk.Stack {
       }
     });
 
-    const appuserCreds = new secretsmanager.Secret(this, "AppUserCreds", {
+    const appuserCreds = new secretsmanager.Secret(this, `${prefix}AppuserAdminCreds`, {
       secretName: `/secrets/${props.appName}/appuser`,
       encryptionKey: props.foundationStack.kmsKey,
       generateSecretString: {
@@ -38,26 +40,38 @@ export class DatabaseStack extends cdk.Stack {
       }
     });
 
-    const mysql_cluster = new rds.DatabaseCluster(this, "DemoAppRdsDb", {
-      defaultDatabaseName: "DemoAppAuroraDatabase",
+    const parameter_group = new rds.ParameterGroup(this, `${prefix}ParameterGroup`, {
+      engine: rds.DatabaseClusterEngine.auroraMysql({
+        version: rds.AuroraMysqlEngineVersion.VER_2_07_2
+      }),
+      parameters: {
+        require_secure_transport: "ON",
+        tls_version: "TLSv1.2"
+      }
+    });
+
+    const mysql_cluster = new rds.DatabaseCluster(this, `${prefix}Cluster`, {
+      defaultDatabaseName: `${prefix}`,
+      parameterGroup: parameter_group,
       storageEncryptionKey: props.foundationStack.kmsKey,
       credentials: rds.Credentials.fromSecret(dbAdminCreds),
-      engine: rds.DatabaseClusterEngine.AURORA,
+      engine: rds.DatabaseClusterEngine.AURORA_MYSQL,
+      s3ImportBuckets: [props.foundationStack.artifactsBucket],
       instanceProps: {
         instanceType: new ec2.InstanceType(ec2.InstanceClass.T3),
         vpc: props.vpcStack.vpc,
         vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE
+          subnetType: ec2.SubnetType.ISOLATED
         }
       }
     });
 
-    new ssm.StringParameter(this, "HostNameSSMParam", {
+    new ssm.StringParameter(this, `${prefix}HostNameSSMParam`, {
       parameterName: `/config/${props.appName}/spring/data/jdbc/hostname`,
       stringValue: mysql_cluster.clusterEndpoint.hostname
     });
 
-    new ssm.StringParameter(this, "PortSSMParam", {
+    new ssm.StringParameter(this, `${prefix}PortSSMParam`, {
       parameterName: `/config/${props.appName}/spring/data/jdbc/port`,
       stringValue: mysql_cluster.clusterEndpoint.port.toString()
     });
