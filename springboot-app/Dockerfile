@@ -12,6 +12,11 @@ COPY ./ /opt/project
 WORKDIR /opt/project
 RUN ./gradlew build --no-daemon
 
+# Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
+RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
+RUN /opt/project/build/image/bin/keytool -importcert -alias AWS-RDS -file global-bundle.pem -keystore \
+  /opt/project/build/image/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
+
 ENV TMP_ROOT=/chroot/app
 # Install the DNF plugins so we can run dnf download
 RUN dnf install -y dnf-plugins-core
