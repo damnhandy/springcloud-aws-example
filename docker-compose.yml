@@ -54,7 +54,7 @@ services:
       timeout: 20s
       retries: 10
     volumes:
-      - ./data/data_mysql.sql:/docker-entrypoint-initdb.d/data_mysql.sql
+      - ./data/V1_initial_db.sql:/docker-entrypoint-initdb.d/V1_initial_db.sql
     secrets:
       - source: root_password
       - source: appuser_password

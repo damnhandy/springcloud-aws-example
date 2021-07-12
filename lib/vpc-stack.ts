@@ -10,8 +10,10 @@ export class VpcStack extends cdk.Stack {
     super(scope, id, props);
 
     this.vpc = new ec2.Vpc(this, "Vpc", {
-      maxAzs: 1
+      maxAzs: 2
     });
+
+    this.gatewayEndpoints = [];
 
     this.gatewayEndpoints.push(
       this.vpc.addGatewayEndpoint(getGatewayServiceName(ec2.GatewayVpcEndpointAwsService.S3), {
