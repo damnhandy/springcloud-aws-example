@@ -35,6 +35,7 @@ const databaseStack = new DatabaseStack(app, "SpringBootDemoAppDBStack", {
 
 
 const datamigrationStack = new DataMigrationStack(app, "SpringBootDataMigraionStack", {
+  env: env,
   foundationStack: foundationStack,
   databaseStack: databaseStack,
   vpcStack: vpcStack,
