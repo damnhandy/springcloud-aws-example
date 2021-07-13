@@ -41,7 +41,10 @@ public class DockerSecretsProcessor implements EnvironmentPostProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(DockerSecretsProcessor.class);
 
   @Override
-  public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
+  public void postProcessEnvironment(
+    ConfigurableEnvironment environment,
+    SpringApplication application
+  ) {
     MimeTypeDetector mimeTypeDetector = new MimeTypeDetector();
     Path secretsRoot = Paths.get("/run/secrets/");
     if (Files.exists(secretsRoot)) {
@@ -78,7 +81,9 @@ public class DockerSecretsProcessor implements EnvironmentPostProcessor {
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
-      environment.getPropertySources().addLast(new PropertiesPropertySource("docker_secrets", properties));
+      environment
+        .getPropertySources()
+        .addLast(new PropertiesPropertySource("docker_secrets", properties));
     }
   }
 }

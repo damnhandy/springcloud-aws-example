@@ -33,15 +33,13 @@ const databaseStack = new DatabaseStack(app, "SpringBootDemoAppDBStack", {
   appName: appName
 });
 
-
 const datamigrationStack = new DataMigrationStack(app, "SpringBootDataMigraionStack", {
   env: env,
   foundationStack: foundationStack,
   databaseStack: databaseStack,
   vpcStack: vpcStack,
   appName: appName
-})
-
+});
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
   env: env,
@@ -53,4 +51,4 @@ const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
 appStack.addDependency(datamigrationStack);
 app.synth({
   validateOnSynthesis: true
-})
+});

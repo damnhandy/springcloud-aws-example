@@ -1,6 +1,6 @@
 import { expect as expectCDK, matchTemplate, MatchStyle } from "@aws-cdk/assert";
 import * as cdk from "@aws-cdk/core";
-import {VpcStack} from "../lib/vpc-stack";
+import { VpcStack } from "../lib/vpc-stack";
 
 test("Empty Stack", () => {
   const app = new cdk.App();

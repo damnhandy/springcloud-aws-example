@@ -33,8 +33,6 @@ export class DataMigrationStack extends cdk.Stack {
       destinationKeyPrefix: "data-jobs"
     });
 
-
-
     const securityGroup = new ec2.SecurityGroup(this, "SecurityGroup1", {
       allowAllOutbound: true,
       description: "Security Group for the Flyway project",

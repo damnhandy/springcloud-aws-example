@@ -43,25 +43,28 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     // Create a load-balanced Fargate service and make it public
-    const ecsService = new ecs_patterns.ApplicationLoadBalancedFargateService(this, "DemoApplication", {
-      serviceName: props.appName,
-      cluster: cluster,
-      cpu: 512,
-      desiredCount: 1,
-      taskImageOptions: {
-        image: ecs.ContainerImage.fromEcrRepository(container.repository),
-        containerPort: 8080,
-        environment: {
-          SPRING_PROFILES_ACTIVE: "aws",
-          JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
-        }
-      },
-      memoryLimitMiB: 1024,
-      publicLoadBalancer: true,
-      listenerPort: 8080
-    });
-
-
+    const ecsService = new ecs_patterns.ApplicationLoadBalancedFargateService(
+      this,
+      "DemoApplication",
+      {
+        serviceName: props.appName,
+        cluster: cluster,
+        cpu: 512,
+        desiredCount: 1,
+        taskImageOptions: {
+          image: ecs.ContainerImage.fromEcrRepository(container.repository),
+          containerPort: 8080,
+          environment: {
+            SPRING_PROFILES_ACTIVE: "aws",
+            JAVA_TOOL_OPTIONS:
+              "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
+          }
+        },
+        memoryLimitMiB: 1024,
+        publicLoadBalancer: true,
+        listenerPort: 8080
+      }
+    );
 
     ecsService.targetGroup.configureHealthCheck({
       path: "/actuator/health/liveness",
@@ -72,6 +75,9 @@ export class ApplicationStack extends cdk.Stack {
 
     container.repository.grantPull(ecsService.taskDefinition.taskRole);
     props.foundationStack.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
-    props.databaseStack.mysql_cluster.connections.allowDefaultPortTo(ecsService.service, "ECS Service to DB");
+    props.databaseStack.mysql_cluster.connections.allowDefaultPortTo(
+      ecsService.service,
+      "ECS Service to DB"
+    );
   }
 }
