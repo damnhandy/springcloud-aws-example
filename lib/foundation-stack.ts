@@ -1,13 +1,17 @@
 import * as cdk from "@aws-cdk/core";
 import * as kms from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";
+import { BasicNetworking, IBasicNetworking } from "./vpc";
 
 export class FoundationStack extends cdk.Stack {
   public kmsKey: kms.IKey;
   public artifactsBucket: s3.IBucket;
+  public networking: IBasicNetworking;
 
   constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
+
+    this.networking = new BasicNetworking(this,"VPC");
 
     this.kmsKey = new kms.Key(this, "DemoAppKey", {
       enableKeyRotation: true,

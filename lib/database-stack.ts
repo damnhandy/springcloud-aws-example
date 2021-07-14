@@ -1,16 +1,15 @@
 import * as cdk from "@aws-cdk/core";
 import * as ec2 from "@aws-cdk/aws-ec2";
-import { VpcStack } from "./vpc-stack";
+import { InstanceClass, InstanceSize, InstanceType } from "@aws-cdk/aws-ec2";
 import { FoundationStack } from "./foundation-stack";
 import * as rds from "@aws-cdk/aws-rds";
 import { IDatabaseCluster } from "@aws-cdk/aws-rds";
 import * as ssm from "@aws-cdk/aws-ssm";
 import { IStringParameter } from "@aws-cdk/aws-ssm";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
-import { InstanceClass, InstanceSize, InstanceType } from "@aws-cdk/aws-ec2";
+import { FlywayProject } from "./flyway-project";
 
 export interface DatabaseStackProps extends cdk.StackProps {
-  readonly vpcStack: VpcStack;
   readonly foundationStack: FoundationStack;
   readonly appName: string;
 }
@@ -58,8 +57,8 @@ export class DatabaseStack extends cdk.Stack {
       engine: rds.DatabaseClusterEngine.AURORA_MYSQL,
       s3ImportBuckets: [props.foundationStack.artifactsBucket],
       instanceProps: {
-        instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.MICRO),
-        vpc: props.vpcStack.vpc,
+        instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.SMALL),
+        vpc: props.foundationStack.networking.vpc,
         vpcSubnets: {
           subnetType: ec2.SubnetType.PRIVATE
         }
@@ -68,7 +67,7 @@ export class DatabaseStack extends cdk.Stack {
     this.appUserCreds.attach(this.mysql_cluster);
 
     const dbSecurityGroup = new ec2.SecurityGroup(this, `${prefix}DBSecurityGroup`, {
-      vpc: props.vpcStack.vpc,
+      vpc: props.foundationStack.networking.vpc,
       securityGroupName: `${prefix}DBSecurityGroup`
     });
 
@@ -77,9 +76,11 @@ export class DatabaseStack extends cdk.Stack {
       stringValue: this.mysql_cluster.clusterEndpoint.hostname
     });
 
+    // hard coding the value for now. this.mysql_cluster.clusterEndpoint.port returns a number,
+    // calling toString() renders float and not a reference to the RDS port value of the endpoint
     new ssm.StringParameter(this, `${prefix}PortSSMParam`, {
       parameterName: `/config/${props.appName}/spring/data/jdbc/port`,
-      stringValue: this.mysql_cluster.clusterEndpoint.port.toString()
+      stringValue: "3306"
     });
 
     this.dbUsername = new ssm.StringParameter(this, `${prefix}DBAdminUsername`, {
@@ -93,10 +94,21 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     function buildJdbcUrl(mysql_cluster: rds.IDatabaseCluster): string {
-      let jdbcUrl = `jdbc:mysql://${
-        mysql_cluster.clusterEndpoint.hostname
-      }:${mysql_cluster.clusterEndpoint.port.toString()}/demoapp`;
+      let jdbcUrl = `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/demoapp`;
       return jdbcUrl;
     }
+
+    new FlywayProject(this, "Flyway", {
+      vpc: props.foundationStack.networking.vpc,
+      dbJdbcUrl: this.dbUrl,
+      dbPassword: this.dbAdminCreds,
+      dbUsername: this.dbUsername,
+      destinationKeyPrefix: "data-jobs",
+      destinationFileName: "data-migration.zip",
+      kmsKey: props.foundationStack.kmsKey,
+      prefix: "app",
+      sourceBucket: props.foundationStack.artifactsBucket,
+      sourceZipPath: "../data-migration-out"
+    });
   }
 }

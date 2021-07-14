@@ -10,7 +10,7 @@
     "test": "jest",
     "cdk": "cdk",
     "prepare": "husky install",
-    "prebuild": "cd data-migration/ && zip -r ../data-migration.zip . && cd -"
+    "prebuild": "cd data-migration/ && zip -r ../data-migration.zip . && mv ../data-migration.zip ../data-migration-out && cd -"
   },
   "devDependencies": {
     "@aws-cdk/assert": "^1.113.0",
@@ -38,6 +38,7 @@
     "@aws-cdk/aws-iam": "^1.113.0",
     "@aws-cdk/aws-kms": "^1.113.0",
     "@aws-cdk/aws-rds": "^1.113.0",
+    "@aws-cdk/aws-s3-assets": "^1.113.0",
     "@aws-cdk/aws-s3-deployment": "^1.113.0",
     "@aws-cdk/aws-secretsmanager": "^1.113.0",
     "@aws-cdk/aws-ssm": "^1.113.0",
