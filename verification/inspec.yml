@@ -7,6 +7,17 @@ license: Apache-2.0
 summary: An InSpec Compliance Profile
 version: 0.1.0
 inspec_version: ">= 4.6.9"
+#inputs:
+#  - name: aws_account_id
+#    description: The AWS AccountID
+#    type: string
+#    required: true
+#    value: <%= ENV['AWS_ACCOUNT_ID'] %>
+#  - name: aws_region
+#    description: The AWS Region
+#    type: string
+#    required: true
+#    value: <%= ENV['AWS_REGION'] %>
 depends:
   - name: inspec-aws
     url: https://github.com/inspec/inspec-aws/archive/v1.52.1.tar.gz

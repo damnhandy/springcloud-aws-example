@@ -11,7 +11,7 @@ export class FoundationStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
     super(scope, id, props);
 
-    this.networking = new BasicNetworking(this,"VPC");
+    this.networking = new BasicNetworking(this, "VPC");
 
     this.kmsKey = new kms.Key(this, "DemoAppKey", {
       enableKeyRotation: true,

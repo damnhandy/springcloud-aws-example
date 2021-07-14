@@ -14,8 +14,7 @@ export interface IBasicNetworking extends IConstruct {
 /**
  *
  */
-export class BasicNetworking extends cdk.Construct implements IBasicNetworking{
-
+export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
   public vpc: ec2.IVpc;
   public gatewayEndpoints: ec2.IGatewayVpcEndpoint[];
 

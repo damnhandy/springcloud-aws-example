@@ -9,3 +9,4 @@ springboot-app/bin
 .settings/
 .vscode/
 .husky
+*/vendor/*
