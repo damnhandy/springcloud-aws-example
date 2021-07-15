@@ -34,10 +34,7 @@ out/
 /dist/
 /nbdist/
 /.nb-gradle/
-
-### VS Code ###
-.vscode/
-
+test/__snapshots__
 *.js
 !jest.config.js
 *.d.ts
