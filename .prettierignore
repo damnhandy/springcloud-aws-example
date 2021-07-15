@@ -2,6 +2,8 @@ build
 coverage
 */.gradle/
 */gradle
+*/gradlew
+*/gradlew.bat
 */.idea
 .idea
 cdk.out
@@ -10,3 +12,4 @@ springboot-app/bin
 .vscode/
 .husky
 */vendor/*
+

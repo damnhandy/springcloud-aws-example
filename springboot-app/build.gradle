@@ -1,6 +1,5 @@
 plugins {
     id 'org.springframework.boot' version '2.4.7'
-    id 'io.spring.dependency-management' version '1.0.11.RELEASE'
     id "org.beryx.runtime" version "1.12.5"
     id 'java'
     id 'maven-publish'
@@ -28,7 +27,9 @@ configurations {
 }
 
 dependencies {
+    implementation platform(org.springframework.boot.gradle.plugin.SpringBootPlugin.BOM_COORDINATES)
     implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:2.3.1")
+    implementation('io.awspring.cloud:spring-cloud-aws-autoconfigure')
     implementation('io.awspring.cloud:spring-cloud-starter-aws-parameter-store-config')
     implementation('io.awspring.cloud:spring-cloud-starter-aws-secrets-manager-config')
     implementation('org.springframework.boot:spring-boot-starter-actuator')
@@ -36,8 +37,7 @@ dependencies {
     implementation('org.springframework.boot:spring-boot-starter-undertow')
     implementation('org.springframework.boot:spring-boot-starter-data-jpa')
     implementation('org.springframework.boot:spring-boot-starter-log4j2')
-    // Used by the Docker Secrets processor to detect the mimetype
-    implementation('org.overviewproject:mime-types:1.0.2')
+    implementation('org.apache.logging.log4j:log4j-web')
     implementation('com.zaxxer:HikariCP')
     implementation('mysql:mysql-connector-java')
     runtimeOnly('io.micrometer:micrometer-registry-prometheus')
@@ -46,6 +46,10 @@ dependencies {
 }
 
 mainClassName = 'com.example.awscloud.AwscloudApplication'
+
+springBoot {
+    buildInfo()
+}
 
 test {
     useJUnitPlatform()
