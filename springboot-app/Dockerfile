@@ -7,16 +7,6 @@ RUN mv jdk-11.0.11+9 /usr/local
 ENV JAVA_HOME /usr/local/jdk-11.0.11+9
 ENV PATH ${JAVA_HOME}/bin:${PATH}
 
-# Build the Java project
-COPY ./ /opt/project
-WORKDIR /opt/project
-RUN ./gradlew build --no-daemon
-
-# Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
-RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
-RUN /opt/project/build/image/bin/keytool -importcert -alias AWS-RDS -file global-bundle.pem -keystore \
-  /opt/project/build/image/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
-
 ENV TMP_ROOT=/chroot/app
 # Install the DNF plugins so we can run dnf download
 RUN dnf install -y dnf-plugins-core
@@ -44,6 +34,16 @@ RUN dnf --installroot=${TMP_ROOT} -y install coreutils glibc-locale-source glibc
   --setopt=override_install_langs=en_US.utf8
 
 RUN echo "LANG=C.utf8" > ${TMP_ROOT}/etc/locale.conf
+
+# Build the Java project
+COPY ./ /opt/project
+WORKDIR /opt/project
+RUN ./gradlew build --no-daemon
+
+# Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
+RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
+RUN /opt/project/build/image/bin/keytool -importcert -alias AWS-RDS -file global-bundle.pem -keystore \
+  /opt/project/build/image/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
 
 RUN groupadd -r appuser --root ${TMP_ROOT}
 RUN useradd -r appuser -G appuser --root ${TMP_ROOT}
