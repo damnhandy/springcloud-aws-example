@@ -68,4 +68,3 @@ ENV LANG=en_US.UTF-8 \
   JAVA_HOME=/usr/local/jdk-11.0.11+9
 ENV PATH=${JAVA_HOME}/bin:/flyway:${PATH}
 USER flywayuser:flywayuser
-

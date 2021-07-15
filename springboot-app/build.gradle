@@ -1,5 +1,5 @@
 plugins {
-    id 'org.springframework.boot' version '2.4.7'
+    id 'org.springframework.boot' version '2.4.8'
     id "org.beryx.runtime" version "1.12.5"
     id 'java'
     id 'maven-publish'
@@ -32,6 +32,7 @@ dependencies {
     implementation('io.awspring.cloud:spring-cloud-aws-autoconfigure')
     implementation('io.awspring.cloud:spring-cloud-starter-aws-parameter-store-config')
     implementation('io.awspring.cloud:spring-cloud-starter-aws-secrets-manager-config')
+    implementation('org.springframework.boot:spring-boot-starter')
     implementation('org.springframework.boot:spring-boot-starter-actuator')
     implementation('org.springframework.boot:spring-boot-starter-jersey')
     implementation('org.springframework.boot:spring-boot-starter-undertow')

@@ -1,20 +1,20 @@
-
 aws:
   paramstore:
     enabled: true
   secretsmanager:
     enabled: true
 spring:
+  application:
+    name: demoapp
   config:
     import:
-      - "aws-secretsmanager:/secret/demoapp/appuser"
-      - "aws-parameterstore:/config/demoapp/spring/data/jdbc/url"
+      - "aws-secretsmanager:/secret/${spring.application.name}/appuser"
     activate:
       on-profile: aws
   datasource:
-    url: "${spring.data.jdbc.url}"
+    url: "jdbc:mysql://${host}:${port}/demoapp"
     username: "appuser"
-    password: "${appuser}"
+    password: "${password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
@@ -34,4 +34,3 @@ spring:
         cacheServerConfiguration: true
         elideSetAutoCommits: true
         maintainTimeStats: false
-

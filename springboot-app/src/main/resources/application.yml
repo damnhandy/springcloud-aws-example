@@ -8,10 +8,4 @@ management:
     health:
       probes:
         enabled: true
-logging:
-  level:
-    io:
-      awspring:
-        cloud:
-          paramstore:
-            AwsParamStorePropertySource=debug:
+
