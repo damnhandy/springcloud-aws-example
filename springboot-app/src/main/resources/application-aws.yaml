@@ -3,14 +3,14 @@ aws:
     enabled: true
   secretsmanager:
     enabled: true
+    default-context: "shared"
+    name: ${spring.application.name}
 spring:
   application:
     name: demoapp
   config:
     import:
       - "aws-secretsmanager:/secret/${spring.application.name}/appuser"
-    activate:
-      on-profile: aws
   datasource:
     url: "jdbc:mysql://${host}:${port}/demoapp"
     username: "appuser"
@@ -20,6 +20,7 @@ spring:
       data-source-properties:
         serverTimezone: UTC
         sslMode: VERIFY_CA
+        # The RDS root certs have been added to the JRE's cacerts
         fallbackToSystemTrustStore: true
         useLegacyDatetimeCode: false
         # Recommended MySQL connection settings from HikariCP

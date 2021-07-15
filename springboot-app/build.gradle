@@ -54,6 +54,18 @@ springBoot {
 
 test {
     useJUnitPlatform()
+    // The AWS v1 SDK will fail if the region is not set, so we configure it via system property. The unit tests
+    // do not call any AWS resources, this is simply a means to ensure that the tests don't fail on resolving the
+    // region in the AwsRegionProviderChain.java.
+    systemProperty("aws.region","us-east-1")
+    testLogging {
+        events "failed"
+        debug {
+            events "started", "skipped", "failed"
+            exceptionFormat "full"
+        }
+        info.events = ["failed", "skipped"]
+    }
 }
 
 tasks.jar.enabled = true
