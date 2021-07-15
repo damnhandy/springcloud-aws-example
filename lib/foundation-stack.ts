@@ -4,6 +4,7 @@ import * as s3 from "@aws-cdk/aws-s3";
 import { BasicNetworking, IBasicNetworking } from "./vpc";
 import { IRepository } from "@aws-cdk/aws-ecr";
 import { EcrRepo } from "./ecr-construct";
+import * as iam from "@aws-cdk/aws-iam";
 
 /**
  * Base stack that sets up foundational resources that maintains resources that should not be
@@ -26,6 +27,9 @@ export class FoundationStack extends cdk.Stack {
       enableKeyRotation: true,
       alias: "alias/DemoAppKey"
     });
+    this.kmsKey.grantEncryptDecrypt(
+      new iam.ServicePrincipal(`logs.${props.env?.region}.amazonaws.com`)
+    );
 
     this.artifactsBucket = new s3.Bucket(this, "ArtifactsBucket", {
       bucketName: `${this.account}-artifacts-${this.region}`,
