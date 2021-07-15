@@ -12,6 +12,8 @@ import { FlywayProject } from "./flyway-project";
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly foundationStack: FoundationStack;
   readonly serviceName: string;
+  readonly appuserSecretName: string;
+  readonly revision: string;
 }
 
 export class DatabaseStack extends cdk.Stack {
@@ -33,7 +35,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, `${prefix}AppuserAdminCreds`, {
-      secretName: `/secret/${props.serviceName}/appuser`,
+      secretName: props.appuserSecretName,
       username: "appuser",
       encryptionKey: props.foundationStack.kmsKey
     });
@@ -66,14 +68,14 @@ export class DatabaseStack extends cdk.Stack {
     this.appUserCreds.attach(this.mysql_cluster);
 
     new ssm.StringParameter(this, `${prefix}HostNameSSMParam`, {
-      parameterName: `/config/${props.serviceName}/spring/data/jdbc/hostname`,
+      parameterName: `/config/${props.serviceName}/jdbc/hostname`,
       stringValue: this.mysql_cluster.clusterEndpoint.hostname
     });
 
     // hard coding the value for now. this.mysql_cluster.clusterEndpoint.port returns a number,
     // calling toString() renders float and not a reference to the RDS port value of the endpoint
     new ssm.StringParameter(this, `${prefix}PortSSMParam`, {
-      parameterName: `/config/${props.serviceName}/spring/data/jdbc/port`,
+      parameterName: `/config/${props.serviceName}/jdbc/port`,
       stringValue: "3306"
     });
 
@@ -83,7 +85,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.dbUrl = new ssm.StringParameter(this, `${prefix}JdbcUrlSSMParam`, {
-      parameterName: `/config/${props.serviceName}/spring/data/jdbc/url`,
+      parameterName: `/config/${props.serviceName}/jdbc/url`,
       stringValue: buildJdbcUrl(this.mysql_cluster)
     });
 
@@ -104,7 +106,8 @@ export class DatabaseStack extends cdk.Stack {
       prefix: "app",
       sourceBucket: props.foundationStack.artifactsBucket,
       sourceZipPath: "../data-migration-out",
-      flywayImageRepo: props.foundationStack.flywayRepo
+      flywayImageRepo: props.foundationStack.flywayRepo,
+      revision: props.revision
     });
   }
 }

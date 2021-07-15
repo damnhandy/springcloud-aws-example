@@ -37,6 +37,7 @@
     "@aws-cdk/aws-ecs-patterns": "^1.113.0",
     "@aws-cdk/aws-iam": "^1.113.0",
     "@aws-cdk/aws-kms": "^1.113.0",
+    "@aws-cdk/aws-logs": "^1.113.0",
     "@aws-cdk/aws-rds": "^1.113.0",
     "@aws-cdk/aws-s3-assets": "^1.113.0",
     "@aws-cdk/aws-s3-deployment": "^1.113.0",

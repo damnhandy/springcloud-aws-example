@@ -33,6 +33,7 @@ export interface FlywayProjectProps extends cdk.StackProps {
   readonly dbUsername: IStringParameter;
   readonly dbJdbcUrl: IStringParameter;
   readonly flywayImageRepo: IRepository;
+  readonly revision: string;
 }
 
 export class FlywayProject extends Construct {
@@ -66,7 +67,9 @@ export class FlywayProject extends Construct {
 
     new ecrdeploy.ECRDeployment(this, "FlywayImageDeployment", {
       src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
-      dest: new ecrdeploy.DockerImageName(`${props.flywayImageRepo.repositoryUri}:latest`)
+      dest: new ecrdeploy.DockerImageName(
+        `${props.flywayImageRepo.repositoryUri}:${props.revision}`
+      )
     });
 
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
