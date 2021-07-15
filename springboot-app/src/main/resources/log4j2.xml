@@ -12,7 +12,9 @@
         <Root level="info">
             <AppenderRef ref="Console" />
         </Root>
-
+        <Logger name="io.awspring.cloud.paramstore.AwsParamStorePropertySource" level="debug" additivity="false">
+            <AppenderRef ref="Console" />
+        </Logger>
         <Logger name="com.example.awscloud" level="debug" additivity="false">
             <AppenderRef ref="Console" />
         </Logger>

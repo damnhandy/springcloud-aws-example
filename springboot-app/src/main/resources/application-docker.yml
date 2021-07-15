@@ -1,14 +1,16 @@
 spring:
+  config:
+    import: "configtree:/run/secrets/"
   datasource:
     url: "jdbc:mysql://mysql:3306/demoapp"
     username: "appuser"
-    password: "${docker.secrets.appuser_password}"
+    password: "${appuser_password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
         serverTimezone: UTC
         sslMode: VERIFY_CA
-        trustCertificateKeyStorePassword: "${docker.secrets.jdbc_truststore_password}"
+        trustCertificateKeyStorePassword: "${truststore_password}"
         trustCertificateKeyStoreType: "PKCS12"
         trustCertificateKeyStoreUrl: "file:${docker.secrets.jdbc_truststore_path}"
         fallbackToSystemTrustStore: false

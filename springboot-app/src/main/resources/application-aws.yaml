@@ -1,19 +1,26 @@
+
+aws:
+  paramstore:
+    enabled: true
+  secretsmanager:
+    enabled: true
 spring:
   config:
-    import: "configtree:./credentials/"
+    import:
+      - "aws-secretsmanager:/secret/demoapp/appuser"
+      - "aws-parameterstore:/config/demoapp/spring/data/jdbc/url"
+    activate:
+      on-profile: aws
   datasource:
-    url: "jdbc:mysql://localhost:3306/demoapp"
+    url: "${spring.data.jdbc.url}"
     username: "appuser"
-    password: "${appuser_password}"
+    password: "${appuser}"
     hikari:
-      maximum-pool-size: 5
+      maximum-pool-size: 20
       data-source-properties:
         serverTimezone: UTC
         sslMode: VERIFY_CA
-        trustCertificateKeyStorePassword: "${jdbc_truststore_password}"
-        trustCertificateKeyStoreType: PKCS12
-        trustCertificateKeyStoreUrl: "file:${PWD}/credentials/truststore.p12"
-        fallbackToSystemTrustStore: false
+        fallbackToSystemTrustStore: true
         useLegacyDatetimeCode: false
         # Recommended MySQL connection settings from HikariCP
         # https://github.com/brettwooldridge/HikariCP/wiki/MySQL-Configuration
@@ -27,3 +34,4 @@ spring:
         cacheServerConfiguration: true
         elideSetAutoCommits: true
         maintainTimeStats: false
+
