@@ -9,7 +9,6 @@ test("create ecr repo without codebuild permissions", () => {
     repositoryName: "apps/demoapp",
     withCodeBuildPolicy: false
   });
-  expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
   expect(stack).toHaveResource("AWS::ECR::Repository", {
     RepositoryName: "apps/demoapp",
     ImageScanningConfiguration: {
@@ -24,7 +23,6 @@ test("create ecr repo with codebuild permissions", () => {
     repositoryName: "apps/demoapp",
     withCodeBuildPolicy: true
   });
-  expect(SynthUtils.toCloudFormation(stack)).toMatchSnapshot();
   expect(stack).toHaveResource("AWS::ECR::Repository", {
     RepositoryName: "apps/demoapp",
     ImageScanningConfiguration: {

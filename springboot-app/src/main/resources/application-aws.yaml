@@ -19,7 +19,7 @@ spring:
       maximum-pool-size: 20
       data-source-properties:
         serverTimezone: UTC
-        sslMode: VERIFY_CA
+        sslMode: VERIFY_IDENTITY
         # The RDS root certs have been added to the JRE's cacerts
         fallbackToSystemTrustStore: true
         useLegacyDatetimeCode: false

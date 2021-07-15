@@ -67,6 +67,11 @@ export class DatabaseStack extends cdk.Stack {
     });
     this.appUserCreds.attach(this.mysql_cluster);
 
+    new ssm.StringParameter(this, `${prefix}SecurityGroupId`, {
+      parameterName: `/env/rds/${prefix}`,
+      stringValue: this.mysql_cluster.connections.securityGroups[0].securityGroupId
+    });
+
     new ssm.StringParameter(this, `${prefix}HostNameSSMParam`, {
       parameterName: `/config/${props.serviceName}/jdbc/hostname`,
       stringValue: this.mysql_cluster.clusterEndpoint.hostname

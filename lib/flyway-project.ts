@@ -20,6 +20,8 @@ import * as ecr from "@aws-cdk/aws-ecr";
 import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as cdk from "@aws-cdk/core";
 import { IRepository } from "@aws-cdk/aws-ecr";
+import * as logs from "@aws-cdk/aws-logs";
+import { RetentionDays } from "@aws-cdk/aws-logs";
 
 export interface FlywayProjectProps extends cdk.StackProps {
   readonly vpc: IVpc;
@@ -72,8 +74,20 @@ export class FlywayProject extends Construct {
       )
     });
 
+    const logGroup = new logs.LogGroup(this, "LogGroup", {
+      encryptionKey: this.kmsKey,
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
+
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
       vpc: this.vpc,
+      logging: {
+        cloudWatch: {
+          logGroup: logGroup,
+          enabled: true
+        }
+      },
       encryptionKey: this.kmsKey,
       description: "Codebuild Project to apply DB changes to the Aurora MySQL instance",
       securityGroups: [this.securityGroup],
@@ -87,7 +101,7 @@ export class FlywayProject extends Construct {
       // Note that this isn't the ideal way to do this. It would be ideal a pre-existing image
       // can be copied to ECR instead of built at the deployment time.
       environment: {
-        buildImage: cb.LinuxBuildImage.fromEcrRepository(props.flywayImageRepo),
+        buildImage: cb.LinuxBuildImage.fromEcrRepository(props.flywayImageRepo, props.revision),
         computeType: ComputeType.SMALL,
         privileged: false,
         environmentVariables: {

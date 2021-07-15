@@ -12,6 +12,8 @@ import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
 import { LogDriver } from "@aws-cdk/aws-ecs";
 import { ISecret, Secret } from "@aws-cdk/aws-secretsmanager";
+import { Port, SecurityGroup } from "@aws-cdk/aws-ec2";
+import { StringParameter } from "@aws-cdk/aws-ssm";
 
 /**
  *
@@ -54,10 +56,9 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     const logGroup = new logs.LogGroup(this, "LogGroup", {
-      logGroupName: `/apps/${props.serviceName}`,
       encryptionKey: props.foundationStack.kmsKey,
       retention: RetentionDays.ONE_WEEK,
-      removalPolicy: RemovalPolicy.RETAIN
+      removalPolicy: RemovalPolicy.DESTROY
     });
 
     // Create a load-balanced Fargate service and make it public
@@ -75,9 +76,9 @@ export class ApplicationStack extends cdk.Stack {
           enableLogging: true,
           logDriver: LogDriver.awsLogs({
             logGroup: logGroup,
-            streamPrefix: `/apps/${props.serviceName}`
+            streamPrefix: `${props.serviceName}`
           }),
-          image: ecs.ContainerImage.fromEcrRepository(this.appRepo),
+          image: ecs.ContainerImage.fromEcrRepository(this.appRepo, props.revision),
           containerPort: 8080,
           environment: {
             SPRING_PROFILES_ACTIVE: "aws",
@@ -100,5 +101,16 @@ export class ApplicationStack extends cdk.Stack {
     appUserCredentials.grantRead(ecsService.taskDefinition.taskRole);
     dockerImageAsset.repository.grantPull(ecsService.taskDefinition.taskRole);
     props.foundationStack.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
+    const rdsSecurityGroupParam = StringParameter.fromStringParameterName(
+      this,
+      "DBSecurityGroupParam",
+      "/env/rds/DemoAppDB"
+    );
+    const dbSg = SecurityGroup.fromSecurityGroupId(
+      this,
+      "DBSecurityuGroup",
+      rdsSecurityGroupParam.stringValue
+    );
+    ecsService.service.connections.allowTo(dbSg, Port.tcp(3306), "Access to RDS");
   }
 }
