@@ -1,5 +1,5 @@
 import * as cdk from "@aws-cdk/core";
-import { RemovalPolicy } from "@aws-cdk/core";
+import { Fn, RemovalPolicy } from "@aws-cdk/core";
 import * as ecr from "@aws-cdk/aws-ecr";
 import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import { FoundationStack } from "./foundation-stack";
@@ -7,35 +7,39 @@ import { Protocol } from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as ecs from "@aws-cdk/aws-ecs";
 import * as ecs_patterns from "@aws-cdk/aws-ecs-patterns";
 import * as path from "path";
+import * as ecrdeploy from "cdk-ecr-deployment";
+import { IRepository } from "@aws-cdk/aws-ecr";
 
 /**
  *
  */
 export interface ApplicationStackProps extends cdk.StackProps {
   readonly foundationStack: FoundationStack;
-  readonly appName: string;
+  readonly serviceName: string;
 }
 
 /**
  *
  */
 export class ApplicationStack extends cdk.Stack {
+  appRepo: IRepository;
+
   constructor(scope: cdk.Construct, id: string, props: ApplicationStackProps) {
     super(scope, id, props);
-
-    const ecrRepo = new ecr.Repository(this, "ECRRepo", {
-      repositoryName: `apps/${props.appName}`,
-      imageScanOnPush: true,
-      removalPolicy: RemovalPolicy.SNAPSHOT
-    });
+    this.appRepo = props.foundationStack.appRepo;
 
     const cluster = new ecs.Cluster(this, "DemoCluster", {
       vpc: props.foundationStack.networking.vpc,
       containerInsights: true
     });
 
-    const container = new ecr_assets.DockerImageAsset(this, "DemoAppContainerAsset", {
+    const dockerImageAsset = new ecr_assets.DockerImageAsset(this, "DemoAppContainerAsset", {
       directory: path.resolve(__dirname, "../springboot-app")
+    });
+
+    new ecrdeploy.ECRDeployment(this, "DeployDockerImage", {
+      src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
+      dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:latest`)
     });
 
     // Create a load-balanced Fargate service and make it public
@@ -43,12 +47,12 @@ export class ApplicationStack extends cdk.Stack {
       this,
       "DemoApplication",
       {
-        serviceName: props.appName,
+        serviceName: props.serviceName,
         cluster: cluster,
         cpu: 512,
         desiredCount: 1,
         taskImageOptions: {
-          image: ecs.ContainerImage.fromDockerImageAsset(container),
+          image: ecs.ContainerImage.fromEcrRepository(this.appRepo),
           containerPort: 8080,
           environment: {
             SPRING_PROFILES_ACTIVE: "aws",
@@ -69,7 +73,7 @@ export class ApplicationStack extends cdk.Stack {
       healthyHttpCodes: "200"
     });
 
-    container.repository.grantPull(ecsService.taskDefinition.taskRole);
+    dockerImageAsset.repository.grantPull(ecsService.taskDefinition.taskRole);
     props.foundationStack.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
   }
 }

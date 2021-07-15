@@ -6,7 +6,7 @@ import { FoundationStack } from "../lib/foundation-stack";
 import { ApplicationStack } from "../lib/application-stack";
 
 // Note that this value Should be the same as the value defined in spring.application.name
-const appName = "demoapp";
+const serviceName = "demoapp";
 
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
@@ -22,14 +22,14 @@ const foundationStack = new FoundationStack(app, "SpringBootDemoFoundationStack"
 const databaseStack = new DatabaseStack(app, "SpringBootDemoAppDBStack", {
   env: env,
   foundationStack: foundationStack,
-  appName: appName
+  serviceName: serviceName
 });
 databaseStack.addDependency(foundationStack);
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
   env: env,
   foundationStack: foundationStack,
-  appName: appName
+  serviceName: serviceName
 });
 appStack.addDependency(databaseStack);
 

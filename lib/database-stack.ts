@@ -11,7 +11,7 @@ import { FlywayProject } from "./flyway-project";
 
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly foundationStack: FoundationStack;
-  readonly appName: string;
+  readonly serviceName: string;
 }
 
 export class DatabaseStack extends cdk.Stack {
@@ -23,7 +23,6 @@ export class DatabaseStack extends cdk.Stack {
 
   constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
-
     const prefix = "DemoAppDB";
     const dbUsername = "admin";
 
@@ -34,7 +33,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, `${prefix}AppuserAdminCreds`, {
-      secretName: `/secret/${props.appName}/appuser`,
+      secretName: `/secret/${props.serviceName}/appuser`,
       username: "appuser",
       encryptionKey: props.foundationStack.kmsKey
     });
@@ -66,20 +65,15 @@ export class DatabaseStack extends cdk.Stack {
     });
     this.appUserCreds.attach(this.mysql_cluster);
 
-    const dbSecurityGroup = new ec2.SecurityGroup(this, `${prefix}DBSecurityGroup`, {
-      vpc: props.foundationStack.networking.vpc,
-      securityGroupName: `${prefix}DBSecurityGroup`
-    });
-
     new ssm.StringParameter(this, `${prefix}HostNameSSMParam`, {
-      parameterName: `/config/${props.appName}/spring/data/jdbc/hostname`,
+      parameterName: `/config/${props.serviceName}/spring/data/jdbc/hostname`,
       stringValue: this.mysql_cluster.clusterEndpoint.hostname
     });
 
     // hard coding the value for now. this.mysql_cluster.clusterEndpoint.port returns a number,
     // calling toString() renders float and not a reference to the RDS port value of the endpoint
     new ssm.StringParameter(this, `${prefix}PortSSMParam`, {
-      parameterName: `/config/${props.appName}/spring/data/jdbc/port`,
+      parameterName: `/config/${props.serviceName}/spring/data/jdbc/port`,
       stringValue: "3306"
     });
 
@@ -89,7 +83,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.dbUrl = new ssm.StringParameter(this, `${prefix}JdbcUrlSSMParam`, {
-      parameterName: `/config/${props.appName}/spring/data/jdbc/url`,
+      parameterName: `/config/${props.serviceName}/spring/data/jdbc/url`,
       stringValue: buildJdbcUrl(this.mysql_cluster)
     });
 
@@ -99,6 +93,7 @@ export class DatabaseStack extends cdk.Stack {
     }
 
     new FlywayProject(this, "Flyway", {
+      env: props.env,
       vpc: props.foundationStack.networking.vpc,
       dbJdbcUrl: this.dbUrl,
       dbPassword: this.dbAdminCreds,
@@ -108,7 +103,8 @@ export class DatabaseStack extends cdk.Stack {
       kmsKey: props.foundationStack.kmsKey,
       prefix: "app",
       sourceBucket: props.foundationStack.artifactsBucket,
-      sourceZipPath: "../data-migration-out"
+      sourceZipPath: "../data-migration-out",
+      flywayImageRepo: props.foundationStack.flywayRepo
     });
   }
 }

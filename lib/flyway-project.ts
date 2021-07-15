@@ -1,4 +1,4 @@
-import { Construct, Fn } from "@aws-cdk/core";
+import { Construct, Fn, RemovalPolicy } from "@aws-cdk/core";
 import * as ec2 from "@aws-cdk/aws-ec2";
 import { ISecurityGroup, IVpc } from "@aws-cdk/aws-ec2";
 import * as cb from "@aws-cdk/aws-codebuild";
@@ -15,9 +15,13 @@ import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
 import { IStringParameter } from "@aws-cdk/aws-ssm";
 import * as iam from "@aws-cdk/aws-iam";
-import { ServicePrincipal } from "@aws-cdk/aws-iam";
+import * as ecrdeploy from "cdk-ecr-deployment";
+import * as ecr from "@aws-cdk/aws-ecr";
+import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
+import * as cdk from "@aws-cdk/core";
+import { IRepository } from "@aws-cdk/aws-ecr";
 
-export interface FlywayProjectProps {
+export interface FlywayProjectProps extends cdk.StackProps {
   readonly vpc: IVpc;
   readonly kmsKey: IKey;
   readonly prefix: string;
@@ -28,6 +32,7 @@ export interface FlywayProjectProps {
   readonly dbPassword: ISecret;
   readonly dbUsername: IStringParameter;
   readonly dbJdbcUrl: IStringParameter;
+  readonly flywayImageRepo: IRepository;
 }
 
 export class FlywayProject extends Construct {
@@ -55,47 +60,13 @@ export class FlywayProject extends Construct {
       vpc: this.vpc
     });
 
-    const flywayProjectPolicy = new iam.ManagedPolicy(this, "CodeBuildPolicy", {
-      managedPolicyName: "flyway-codebuild-policy",
-      statements: [
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: [
-            "ecr:GetDownloadUrlForLayer",
-            "ecr:BatchGetImage",
-            "ecr:BatchCheckLayerAvailability"
-          ],
-          resources: ["*"]
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["secretsmanager:GetSecretValue"],
-          resources: [props.dbPassword.secretArn]
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["kms:Decrypt", "kms:DescribeKey"],
-          resources: [props.dbUsername.parameterArn, props.dbJdbcUrl.parameterArn]
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["kms:Decrypt", "kms:DescribeKey"],
-          resources: [this.kmsKey.keyArn]
-        }),
-        new iam.PolicyStatement({
-          effect: iam.Effect.ALLOW,
-          actions: ["s3:GetObject*", "s3:GetBucket*", "s3:List*"],
-          resources: [
-            `${props.sourceBucket.bucketArn}/${props.destinationKeyPrefix}/${props.destinationFileName}`
-          ]
-        })
-      ]
+    const flywayContainer = new ecr_assets.DockerImageAsset(this, "FlywayContainerAsset", {
+      directory: path.resolve(__dirname, "../flyway-container")
     });
 
-    const flywayProjectRole = new iam.Role(this, "CodeBuildProjectRole", {
-      assumedBy: new iam.ServicePrincipal("codebuild.amazonaws.com"),
-      roleName: "flyway-code-build-role",
-      managedPolicies: [flywayProjectPolicy]
+    new ecrdeploy.ECRDeployment(this, "FlywayImageDeployment", {
+      src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
+      dest: new ecrdeploy.DockerImageName(`${props.flywayImageRepo.repositoryUri}:latest`)
     });
 
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
@@ -103,7 +74,6 @@ export class FlywayProject extends Construct {
       encryptionKey: this.kmsKey,
       description: "Codebuild Project to apply DB changes to the Aurora MySQL instance",
       securityGroups: [this.securityGroup],
-      role: flywayProjectRole,
       source: Source.s3({
         bucket: props.sourceBucket,
         path: `${props.destinationKeyPrefix}/${props.destinationFileName}`
@@ -114,9 +84,7 @@ export class FlywayProject extends Construct {
       // Note that this isn't the ideal way to do this. It would be ideal a pre-existing image
       // can be copied to ECR instead of built at the deployment time.
       environment: {
-        buildImage: cb.LinuxBuildImage.fromAsset(this, "flyway", {
-          directory: path.resolve(__dirname, "../flyway-container")
-        }),
+        buildImage: cb.LinuxBuildImage.fromEcrRepository(props.flywayImageRepo),
         computeType: ComputeType.SMALL,
         privileged: false,
         environmentVariables: {
@@ -139,7 +107,7 @@ export class FlywayProject extends Construct {
           },
           FLYWAY_PASSWORD: {
             type: BuildEnvironmentVariableType.SECRETS_MANAGER,
-            value: props.dbPassword.secretName
+            value: props.dbPassword.secretArn
           }
         }
       },
@@ -148,7 +116,7 @@ export class FlywayProject extends Construct {
         version: 0.2,
         phases: {
           build: {
-            commands: ["flyway migrate"],
+            commands: ["/usr/local/bin/flyway migrate"],
             finally: ["echo Migration complete."]
           }
         }
