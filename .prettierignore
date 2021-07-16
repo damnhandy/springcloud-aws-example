@@ -12,3 +12,6 @@ springboot-app/bin
 .vscode/
 .husky
 */vendor/*
+# compiled TS files
+*.js
+*.d.ts
