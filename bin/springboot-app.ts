@@ -8,7 +8,7 @@ import * as cp from "child_process";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
 
-const revision = `git-commit-${cp.execSync("git rev-parse HEAD").toString().trim()}`;
+const revision = `git-${cp.execSync("git rev-parse HEAD").toString().trim()}`;
 const appuserSecretName = `/secret/${serviceName}/appuser`;
 
 const env = {

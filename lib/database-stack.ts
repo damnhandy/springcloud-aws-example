@@ -101,7 +101,7 @@ export class DatabaseStack extends cdk.Stack {
 
     new FlywayProject(this, "Flyway", {
       env: props.env,
-      vpc: props.foundationStack.networking.vpc,
+      networking: props.foundationStack.networking,
       dbJdbcUrl: this.dbUrl,
       dbPassword: this.dbAdminCreds,
       dbUsername: this.dbUsername,

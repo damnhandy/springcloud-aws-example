@@ -5,13 +5,13 @@ import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import { FoundationStack } from "./foundation-stack";
 import { Protocol } from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as ecs from "@aws-cdk/aws-ecs";
+import { LogDriver } from "@aws-cdk/aws-ecs";
 import * as ecs_patterns from "@aws-cdk/aws-ecs-patterns";
 import * as path from "path";
 import * as ecrdeploy from "cdk-ecr-deployment";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
-import { LogDriver } from "@aws-cdk/aws-ecs";
-import { ISecret, Secret } from "@aws-cdk/aws-secretsmanager";
+import { Secret } from "@aws-cdk/aws-secretsmanager";
 import { Port, SecurityGroup } from "@aws-cdk/aws-ec2";
 import { StringParameter } from "@aws-cdk/aws-ssm";
 

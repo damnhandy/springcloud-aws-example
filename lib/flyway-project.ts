@@ -1,4 +1,5 @@
-import { Construct, Fn, RemovalPolicy } from "@aws-cdk/core";
+import * as cdk from "@aws-cdk/core";
+import { Construct, RemovalPolicy } from "@aws-cdk/core";
 import * as ec2 from "@aws-cdk/aws-ec2";
 import { ISecurityGroup, IVpc } from "@aws-cdk/aws-ec2";
 import * as cb from "@aws-cdk/aws-codebuild";
@@ -14,17 +15,15 @@ import * as s3 from "@aws-cdk/aws-s3";
 import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
 import { IStringParameter } from "@aws-cdk/aws-ssm";
-import * as iam from "@aws-cdk/aws-iam";
 import * as ecrdeploy from "cdk-ecr-deployment";
-import * as ecr from "@aws-cdk/aws-ecr";
-import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
-import * as cdk from "@aws-cdk/core";
 import { IRepository } from "@aws-cdk/aws-ecr";
+import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
+import { IBasicNetworking } from "./vpc";
 
 export interface FlywayProjectProps extends cdk.StackProps {
-  readonly vpc: IVpc;
+  readonly networking: IBasicNetworking;
   readonly kmsKey: IKey;
   readonly prefix: string;
   readonly sourceBucket: s3.IBucket;
@@ -39,6 +38,7 @@ export interface FlywayProjectProps extends cdk.StackProps {
 }
 
 export class FlywayProject extends Construct {
+  networking: IBasicNetworking;
   vpc: IVpc;
   kmsKey: IKey;
   securityGroup: ISecurityGroup;
@@ -46,8 +46,8 @@ export class FlywayProject extends Construct {
 
   constructor(scope: Construct, id: string, props: FlywayProjectProps) {
     super(scope, id);
-
-    this.vpc = props.vpc;
+    this.networking = props.networking;
+    this.vpc = this.networking.vpc;
     this.kmsKey = props.kmsKey;
 
     new s3deploy.BucketDeployment(this, "CopySQLData", {
@@ -57,11 +57,12 @@ export class FlywayProject extends Construct {
     });
 
     this.securityGroup = new ec2.SecurityGroup(this, "ProjectSecurityGroup", {
-      allowAllOutbound: true,
+      allowAllOutbound: false,
       description: "Security Group for the Flyway CodeBuild project",
       securityGroupName: "FlywayCodeBuildProjectSG",
       vpc: this.vpc
     });
+    this.networking.addEgressToVpcServiceEndpoint(this.securityGroup);
 
     const flywayContainer = new ecr_assets.DockerImageAsset(this, "FlywayContainerAsset", {
       directory: path.resolve(__dirname, "../flyway-container")
@@ -77,13 +78,14 @@ export class FlywayProject extends Construct {
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       encryptionKey: this.kmsKey,
       retention: RetentionDays.ONE_WEEK,
-      removalPolicy: RemovalPolicy.DESTROY
+      removalPolicy: RemovalPolicy.RETAIN
     });
 
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
       vpc: this.vpc,
       logging: {
         cloudWatch: {
+          prefix: "flyway",
           logGroup: logGroup,
           enabled: true
         }
@@ -98,8 +100,6 @@ export class FlywayProject extends Construct {
       subnetSelection: this.vpc.selectSubnets({
         subnets: this.vpc.privateSubnets
       }),
-      // Note that this isn't the ideal way to do this. It would be ideal a pre-existing image
-      // can be copied to ECR instead of built at the deployment time.
       environment: {
         buildImage: cb.LinuxBuildImage.fromEcrRepository(props.flywayImageRepo, props.revision),
         computeType: ComputeType.SMALL,
@@ -127,17 +127,7 @@ export class FlywayProject extends Construct {
             value: props.dbPassword.secretArn
           }
         }
-      },
-
-      buildSpec: cb.BuildSpec.fromObject({
-        version: 0.2,
-        phases: {
-          build: {
-            commands: ["/usr/local/bin/flyway migrate"],
-            finally: ["echo Migration complete."]
-          }
-        }
-      })
+      }
     });
 
     this.kmsKey.grantDecrypt(this.flywayProject);
