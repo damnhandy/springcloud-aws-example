@@ -41,8 +41,8 @@ RUN mkdir ${TMP_ROOT}/flyway
 RUN tar -xzf flyway-commandline-${FLYWAY_VERSION}.tar.gz --strip-components=1 -C ${TMP_ROOT}/flyway
 
 # Add the RDS root certs so we can make connections to RDS over TLS
-RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
-RUN ${TMP_ROOT}/usr/local/jdk-11.0.11+9/bin/keytool -importcert -alias AWS-RDS -file global-bundle.pem -keystore \
+RUN curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o us-east-1-bundle.pem
+RUN ${TMP_ROOT}/usr/local/jdk-11.0.11+9/bin/keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
   ${TMP_ROOT}/usr/local/jdk-11.0.11+9/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
 
 RUN chmod +x ${TMP_ROOT}/flyway/flyway

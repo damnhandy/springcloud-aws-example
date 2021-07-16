@@ -20,9 +20,14 @@ if [[ -f "./credentials/jdbc_truststore_aws.p12" ]]; then
   rm ./credentials/jdbc_truststore_aws.p12
 fi
 
-curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o ./credentials/global-bundle.pem
+# https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.SSL.html
+curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o ./credentials/us-east-1-bundle.pem
 
-keytool -importcert -alias AWS-RDS -file ./credentials/global-bundle.pem -keystore \
-  ./credentials/jdbc_truststore_aws.p12 -storetype pkcs12 -noprompt -storepass ${truststore_passwd}
+keytool -importcert -alias rds-root -file ./credentials/us-east-1-bundle.pem -keystore \
+  ./credentials/jdbc_truststore_aws.p12 -storetype pkcs12 -noprompt -storepass "changeit"
 
-zip ./credentials/jdbc_truststore_aws.p12.zip ./credentials/jdbc_truststore_aws.p12
+if [[ ! -d "./springboot-app/truststores" ]]; then
+  mkdir "./springboot-app/truststores"
+fi
+
+cp ./credentials/jdbc_truststore_aws.p12 "./springboot-app/truststores/jdbc_truststore_aws.p12"

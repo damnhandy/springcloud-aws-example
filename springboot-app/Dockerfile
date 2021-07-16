@@ -41,9 +41,11 @@ WORKDIR /opt/project
 RUN ./gradlew build --no-daemon
 
 # Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
-RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
-RUN /opt/project/build/image/bin/keytool -importcert -alias AWS-RDS -file global-bundle.pem -keystore \
+RUN curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o us-east-1-bundle.pem
+RUN /opt/project/build/image/bin/keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
   /opt/project/build/image/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
+
+COPY truststores/jdbc_truststore_aws.p12 /opt/project/build/image/jdbc_truststore_aws.p12
 
 RUN groupadd -r appuser --root ${TMP_ROOT}
 RUN useradd -r appuser -G appuser --root ${TMP_ROOT}

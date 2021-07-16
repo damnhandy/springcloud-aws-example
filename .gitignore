@@ -39,7 +39,7 @@ test/__snapshots__
 !jest.config.js
 *.d.ts
 node_modules
-
+springboot-app/truststores
 # CDK asset staging directory
 .cdk.staging
 cdk.out

@@ -20,7 +20,13 @@ spring:
       data-source-properties:
         serverTimezone: UTC
         sslMode: VERIFY_IDENTITY
-        # The RDS root certs have been added to the JRE's cacerts
+        trustCertificateKeyStorePassword: "changeit"
+        trustCertificateKeyStoreType: "PKCS12"
+        trustCertificateKeyStoreUrl: "file:/opt/app/jdbc_truststore_aws.p12"
+        # MySQL Connector/J doesn't enable TLSv1.2 by default and it MUST be explicitly enabled when the server
+        # is configured to use it. In this case, the RDS database is setup to require that clients use TLSv1.2
+        # https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-usagenotes-known-issues-limitations.html
+        enabledTLSProtocols: "TLSv1.2"
         fallbackToSystemTrustStore: true
         useLegacyDatetimeCode: false
         # Recommended MySQL connection settings from HikariCP
