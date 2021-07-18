@@ -23,7 +23,6 @@ import { ParamNames } from "./names";
 export interface ApplicationStackProps extends cdk.StackProps {
   readonly vpc: IVpc;
   readonly serviceName: string;
-  readonly appuserSecretName: string;
   readonly revision: string;
 }
 
@@ -52,7 +51,7 @@ export class ApplicationStack extends cdk.Stack {
     const appUserCredentials = Secret.fromSecretNameV2(
       this,
       "AppUserSecret",
-      props.appuserSecretName
+      ParamNames.DEMO_APP_USER_SECRET
     );
 
     const cluster = new ecs.Cluster(this, "DemoCluster", {

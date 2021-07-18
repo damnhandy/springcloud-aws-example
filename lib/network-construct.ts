@@ -37,7 +37,7 @@ export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
     });
 
     new StringParameter(this, "VpcIdParam", {
-      description: "",
+      description: "DemoApp VPC",
       parameterName: ParamNames.VPC_ID,
       stringValue: this.vpc.vpcId,
       type: ParameterType.STRING

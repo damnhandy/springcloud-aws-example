@@ -30,6 +30,11 @@ export class ParamNames {
     name: "ci/flyway"
   });
 
+  public static readonly FLYWAY_PROJECT_NAME = ParamNames.envPath({
+    context: "codebuild",
+    name: "flyway/name"
+  });
+
   public static readonly VPC_ID = ParamNames.envPath({
     context: "vpc",
     name: `${ParamNames.APP_NAME}/id`

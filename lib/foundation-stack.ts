@@ -36,14 +36,14 @@ export class FoundationStack extends cdk.Stack {
     );
 
     new StringParameter(this, "KmsKeyArnParam", {
-      description: "",
+      description: "DemoApp KMS Key ARN",
       parameterName: ParamNames.KMS_ARN,
       stringValue: this.kmsKey.keyArn,
       type: ParameterType.STRING
     });
 
     new StringParameter(this, "KmsKeyIdParam", {
-      description: "",
+      description: "DemoApp KMS Key ID",
       parameterName: ParamNames.KMS_ID,
       stringValue: this.kmsKey.keyId,
       type: ParameterType.STRING
@@ -67,14 +67,14 @@ export class FoundationStack extends cdk.Stack {
     });
 
     new StringParameter(this, "ArtifactsBucketArnParam", {
-      description: "",
+      description: "Artifacts Bucket ARN",
       parameterName: ParamNames.ARTIFACTS_BUCKET_ARN,
       stringValue: this.artifactsBucket.bucketArn,
       type: ParameterType.STRING
     });
 
     new StringParameter(this, "ArtifactsBucketNameParam", {
-      description: "",
+      description: "Artifacts Bucket Name",
       parameterName: ParamNames.ARTIFACTS_BUCKET_NAME,
       stringValue: this.artifactsBucket.bucketName,
       type: ParameterType.STRING

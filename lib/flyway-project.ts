@@ -14,6 +14,7 @@ import { IKey } from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";
 import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
+import * as ssm from "@aws-cdk/aws-ssm";
 import { IStringParameter } from "@aws-cdk/aws-ssm";
 import * as ecrdeploy from "cdk-ecr-deployment";
 import { IRepository } from "@aws-cdk/aws-ecr";
@@ -21,9 +22,10 @@ import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
 import * as lambda from "@aws-cdk/aws-lambda";
-//import { S3EventSource } from "@aws-cdk/aws-lambda-event-sources";
-// import { NodejsFunction } from "@aws-cdk/aws-lambda-nodejs";
 import { ReferenceUtils } from "./utils";
+import { ParamNames } from "./names";
+import { NodejsFunction } from "@aws-cdk/aws-lambda-nodejs";
+import { Effect, PolicyStatement } from "@aws-cdk/aws-iam";
 
 export interface FlywayProjectProps extends cdk.StackProps {
   readonly vpc: IVpc;
@@ -37,6 +39,7 @@ export interface FlywayProjectProps extends cdk.StackProps {
   readonly dbAppUser: ISecret;
   readonly dbJdbcUrl: IStringParameter;
   readonly flywayImageRepo: IRepository;
+  readonly mysqlSecurityGroup: ISecurityGroup;
   readonly revision: string;
 }
 
@@ -88,32 +91,11 @@ export class FlywayProject extends Construct {
       removalPolicy: RemovalPolicy.RETAIN
     });
 
-    // const myFunction = new NodejsFunction(this, "EventTrigger", {
-    //   memorySize: 1024,
-    //   timeout: cdk.Duration.seconds(5),
-    //   runtime: lambda.Runtime.NODEJS_14_X,
-    //   handler: "main",
-    //   entry: path.join(__dirname, `/../src/my-lambda/index.ts`),
-    //   bundling: {
-    //     minify: true,
-    //     externalModules: ["aws-sdk"]
-    //   }
-    // });
-
-    const handler = new lambda.Function(this, "EventTrigger", {
-      runtime: lambda.Runtime.NODEJS_14_X,
-      logRetention: RetentionDays.ONE_WEEK,
-      code: lambda.Code.fromAsset(path.join(__dirname, "../lambdas")),
-      handler: "s3-trigger.handler",
-      environment: {
-        BUCKET: props.sourceBucket.bucketName
-      }
-    });
     // const s3EventSource = new S3EventSource(props.sourceBucket, {
     //   events: [s3.EventType.OBJECT_CREATED, s3.EventType.OBJECT_CREATED_PUT],
     //   filters: [{ prefix: "data-jobs/" }]
     // });
-    // handler.addEventSource(s3EventSource);
+    // codebuildTrigger.addEventSource(s3EventSource);
 
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
       vpc: this.vpc,
@@ -159,26 +141,49 @@ export class FlywayProject extends Construct {
       }
     });
 
+    /**
+     * Needed for the Lambda trigger to resolve the project name.
+     */
+    new ssm.StringParameter(this, "FlywayProjectNameSSMParam", {
+      parameterName: ParamNames.FLYWAY_PROJECT_NAME,
+      stringValue: this.flywayProject.projectName
+    });
+
     this.kmsKey.grantDecrypt(this.flywayProject);
     props.sourceBucket.grantRead(this.flywayProject);
     // There's a bug in Project resource where the ARNs for the SSM parameters
     // include a double slash, making the policy invalid. Thus, we need to re-add them
     props.dbJdbcUrl.grantRead(this.flywayProject);
-    // One would think that the statement below would also make sense. However, the CDK will
-    // error out citing:
-    //
-    // Adding this dependency (SpringBootDemoFoundationStack ->
-    // SpringBootDemoAppDBStack/Flyway/CodeBuildProject/Role/Resource.Arn) would create a
-    // cyclic reference.
-    //
-    // thus, we leave this commented out:
-    // props.dbPassword.grantRead(this.flywayProject);
 
-    this.referenceUtils.addToSecurityGroup({
-      source: this.flywayProject,
-      parameterName: "/env/rds/DemoAppDB",
-      port: Port.tcp(3306),
-      description: "Application access to RDS"
+    this.flywayProject.connections.allowTo(
+      props.mysqlSecurityGroup,
+      Port.tcp(3306),
+      "Application access to RDS"
+    );
+
+    const codebuildTrigger = new NodejsFunction(this, "EventTrigger", {
+      memorySize: 1024,
+      timeout: cdk.Duration.seconds(5),
+      runtime: lambda.Runtime.NODEJS_14_X,
+      handler: "main",
+      entry: path.join(__dirname, "../lambdas/codebuild-trigger/s3-trigger.ts"),
+      environment: {
+        BUCKET: props.sourceBucket.bucketName,
+        KEY: `${props.destinationKeyPrefix}/${props.destinationFileName}`,
+        PROJECT_NAME: this.flywayProject.projectName
+      },
+      bundling: {
+        minify: false,
+        externalModules: ["aws-sdk"]
+      }
     });
+    props.sourceBucket.grantRead(codebuildTrigger);
+    codebuildTrigger.addToRolePolicy(
+      new PolicyStatement({
+        effect: Effect.ALLOW,
+        actions: ["codebuild:StartBuild"],
+        resources: [this.flywayProject.projectArn]
+      })
+    );
   }
 }

@@ -15,9 +15,9 @@ import { ReferenceUtils } from "./utils";
 
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly vpc: IVpc;
+  readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
   readonly databaseName: string;
-  readonly appuserSecretName: string;
   readonly revision: string;
 }
 
@@ -35,16 +35,14 @@ export class DatabaseStack extends cdk.Stack {
 
   constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
-
+    this.artifactsBucket = props.artifactsBucket;
     this.referenceUtils = new ReferenceUtils(this, "RefUtil");
+
     const dbUsername = "admin";
     this.databaseName = props.databaseName;
+
     this.kmsKey = this.referenceUtils.findKmsKeyByParam(
       StringParameter.fromStringParameterName(this, "KmsRef", ParamNames.KMS_ARN)
-    );
-
-    this.artifactsBucket = this.referenceUtils.findBucketByParam(
-      StringParameter.fromStringParameterName(this, "BucketRef", ParamNames.ARTIFACTS_BUCKET_ARN)
     );
 
     this.flywayRepo = this.referenceUtils.findEcrRepoByParam(
@@ -62,7 +60,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, "AppuserAdminCreds", {
-      secretName: props.appuserSecretName,
+      secretName: ParamNames.DEMO_APP_USER_SECRET,
       username: "appuser",
       encryptionKey: this.kmsKey
     });
@@ -87,6 +85,7 @@ export class DatabaseStack extends cdk.Stack {
       instanceProps: {
         instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.SMALL),
         vpc: props.vpc,
+        publiclyAccessible: false,
         vpcSubnets: {
           subnetType: ec2.SubnetType.PRIVATE
         }
@@ -94,6 +93,11 @@ export class DatabaseStack extends cdk.Stack {
       deletionProtection: false
     });
 
+    // this.mysql_cluster.connections.allowFrom(
+    //   Peer.ipv4(props.vpc.vpcCidrBlock),
+    //   Port.tcp(3306),
+    //   "Allow from within VPC"
+    // );
     this.appUserCreds.attach(this.mysql_cluster);
 
     new ssm.StringParameter(this, "SecurityGroupId", {
@@ -146,6 +150,7 @@ export class DatabaseStack extends cdk.Stack {
       sourceBucket: this.artifactsBucket,
       sourceZipPath: "../data-migration-out",
       flywayImageRepo: this.flywayRepo,
+      mysqlSecurityGroup: this.mysql_cluster.connections.securityGroups[0],
       revision: props.revision
     });
   }
