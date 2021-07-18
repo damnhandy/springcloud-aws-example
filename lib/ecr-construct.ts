@@ -27,6 +27,7 @@ export class EcrRepo extends Construct {
   constructor(scope: Construct, id: string, props: EcrRepoProps) {
     super(scope, id);
     this.props = props;
+
     this.repository = new ecr.Repository(this, "ECRRepo", {
       repositoryName: this.props.repositoryName,
       imageScanOnPush: true,
@@ -34,13 +35,23 @@ export class EcrRepo extends Construct {
       lifecycleRules: [
         {
           description:
-            "Limits the age of a container image the the specified number of days, with a default of 120",
+            "Limits the number of days that a tagged container image can reside in the repo. " +
+            "The default is 120 days",
           maxImageAge: this.getMaxAge(),
-          rulePriority: 1,
+          rulePriority: 100,
+          tagStatus: TagStatus.ANY
+        },
+        {
+          description:
+            "Limits the number of untagged images that sit in the repo. The default is 20." +
+            "Typically, untagged images are not referenced.",
+          maxImageCount: this.getMaxImageCount(),
+          rulePriority: 50,
           tagStatus: TagStatus.UNTAGGED
         }
       ]
     });
+
     // Required for ECR repos that will be used by CodeBuild
     if (this.props.withCodeBuildPolicy) {
       this.repository.addToResourcePolicy(
@@ -66,7 +77,7 @@ export class EcrRepo extends Construct {
 
   getMaxImageCount(): number {
     if (this.props.maxImageCount == undefined) {
-      return 200;
+      return 20;
     }
     return this.props.maxImageCount;
   }

@@ -1,7 +1,7 @@
 import * as cdk from "@aws-cdk/core";
 import { Construct, RemovalPolicy } from "@aws-cdk/core";
 import * as ec2 from "@aws-cdk/aws-ec2";
-import { ISecurityGroup, IVpc } from "@aws-cdk/aws-ec2";
+import { ISecurityGroup, IVpc, Port } from "@aws-cdk/aws-ec2";
 import * as cb from "@aws-cdk/aws-codebuild";
 import {
   BuildEnvironmentVariableType,
@@ -20,35 +20,38 @@ import { IRepository } from "@aws-cdk/aws-ecr";
 import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
-import { IBasicNetworking } from "./vpc";
+import * as lambda from "@aws-cdk/aws-lambda";
+//import { S3EventSource } from "@aws-cdk/aws-lambda-event-sources";
+// import { NodejsFunction } from "@aws-cdk/aws-lambda-nodejs";
+import { ReferenceUtils } from "./utils";
 
 export interface FlywayProjectProps extends cdk.StackProps {
-  readonly networking: IBasicNetworking;
+  readonly vpc: IVpc;
   readonly kmsKey: IKey;
   readonly prefix: string;
   readonly sourceBucket: s3.IBucket;
   readonly destinationKeyPrefix: string;
   readonly destinationFileName: string;
   readonly sourceZipPath: string;
-  readonly dbPassword: ISecret;
-  readonly dbUsername: IStringParameter;
+  readonly dbAdminSecret: ISecret;
+  readonly dbAppUser: ISecret;
   readonly dbJdbcUrl: IStringParameter;
   readonly flywayImageRepo: IRepository;
   readonly revision: string;
 }
 
 export class FlywayProject extends Construct {
-  networking: IBasicNetworking;
   vpc: IVpc;
   kmsKey: IKey;
   securityGroup: ISecurityGroup;
   flywayProject: IProject;
+  referenceUtils: ReferenceUtils;
 
   constructor(scope: Construct, id: string, props: FlywayProjectProps) {
     super(scope, id);
-    this.networking = props.networking;
-    this.vpc = this.networking.vpc;
+    this.vpc = props.vpc;
     this.kmsKey = props.kmsKey;
+    this.referenceUtils = new ReferenceUtils(this, "RefUtil");
 
     new s3deploy.BucketDeployment(this, "CopySQLData", {
       sources: [s3deploy.Source.asset(path.resolve(__dirname, props.sourceZipPath))],
@@ -57,22 +60,26 @@ export class FlywayProject extends Construct {
     });
 
     this.securityGroup = new ec2.SecurityGroup(this, "ProjectSecurityGroup", {
-      allowAllOutbound: false,
+      allowAllOutbound: true,
       description: "Security Group for the Flyway CodeBuild project",
       securityGroupName: "FlywayCodeBuildProjectSG",
       vpc: this.vpc
     });
-    this.networking.addEgressToVpcServiceEndpoint(this.securityGroup);
 
     const flywayContainer = new ecr_assets.DockerImageAsset(this, "FlywayContainerAsset", {
       directory: path.resolve(__dirname, "../flyway-container")
     });
 
-    new ecrdeploy.ECRDeployment(this, "FlywayImageDeployment", {
+    new ecrdeploy.ECRDeployment(this, "FlywayImageDeploymentTagged", {
       src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
       dest: new ecrdeploy.DockerImageName(
         `${props.flywayImageRepo.repositoryUri}:${props.revision}`
       )
+    });
+
+    new ecrdeploy.ECRDeployment(this, "FlywayImageDeploymentLatestTag", {
+      src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
+      dest: new ecrdeploy.DockerImageName(`${props.flywayImageRepo.repositoryUri}:latest`)
     });
 
     const logGroup = new logs.LogGroup(this, "LogGroup", {
@@ -81,12 +88,39 @@ export class FlywayProject extends Construct {
       removalPolicy: RemovalPolicy.RETAIN
     });
 
+    // const myFunction = new NodejsFunction(this, "EventTrigger", {
+    //   memorySize: 1024,
+    //   timeout: cdk.Duration.seconds(5),
+    //   runtime: lambda.Runtime.NODEJS_14_X,
+    //   handler: "main",
+    //   entry: path.join(__dirname, `/../src/my-lambda/index.ts`),
+    //   bundling: {
+    //     minify: true,
+    //     externalModules: ["aws-sdk"]
+    //   }
+    // });
+
+    const handler = new lambda.Function(this, "EventTrigger", {
+      runtime: lambda.Runtime.NODEJS_14_X,
+      logRetention: RetentionDays.ONE_WEEK,
+      code: lambda.Code.fromAsset(path.join(__dirname, "../lambdas")),
+      handler: "s3-trigger.handler",
+      environment: {
+        BUCKET: props.sourceBucket.bucketName
+      }
+    });
+    // const s3EventSource = new S3EventSource(props.sourceBucket, {
+    //   events: [s3.EventType.OBJECT_CREATED, s3.EventType.OBJECT_CREATED_PUT],
+    //   filters: [{ prefix: "data-jobs/" }]
+    // });
+    // handler.addEventSource(s3EventSource);
+
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
       vpc: this.vpc,
       logging: {
         cloudWatch: {
           prefix: "flyway",
-          logGroup: logGroup,
+          logGroup,
           enabled: true
         }
       },
@@ -101,30 +135,25 @@ export class FlywayProject extends Construct {
         subnets: this.vpc.privateSubnets
       }),
       environment: {
-        buildImage: cb.LinuxBuildImage.fromEcrRepository(props.flywayImageRepo, props.revision),
+        buildImage: cb.LinuxBuildImage.STANDARD_5_0,
         computeType: ComputeType.SMALL,
         privileged: false,
+        // These values could have been just as easily added to the buildspec.yml directly
+        // the upside of adding them here is twofold:
+        // - It adds the IAM policy to read the values
+        // - It fails faster if the permissions have not been granted
         environmentVariables: {
-          // https://flywaydb.org/documentation/configuration/parameters/baselineOnMigrate
-          FLYWAY_BASELINE_ON_MIGRATE: {
-            type: BuildEnvironmentVariableType.PLAINTEXT,
-            value: true
-          },
-          FLYWAY_LOCATIONS: {
-            type: BuildEnvironmentVariableType.PLAINTEXT,
-            value: "filesystem:./sql"
-          },
           FLYWAY_URL: {
             type: BuildEnvironmentVariableType.PARAMETER_STORE,
             value: props.dbJdbcUrl.parameterName
           },
-          FLYWAY_USER: {
-            type: BuildEnvironmentVariableType.PARAMETER_STORE,
-            value: props.dbUsername.parameterName
-          },
-          FLYWAY_PASSWORD: {
+          ADMIN_CREDS: {
             type: BuildEnvironmentVariableType.SECRETS_MANAGER,
-            value: props.dbPassword.secretArn
+            value: props.dbAdminSecret.secretArn
+          },
+          APP_USER_CREDS: {
+            type: BuildEnvironmentVariableType.SECRETS_MANAGER,
+            value: props.dbAppUser.secretArn
           }
         }
       }
@@ -132,5 +161,24 @@ export class FlywayProject extends Construct {
 
     this.kmsKey.grantDecrypt(this.flywayProject);
     props.sourceBucket.grantRead(this.flywayProject);
+    // There's a bug in Project resource where the ARNs for the SSM parameters
+    // include a double slash, making the policy invalid. Thus, we need to re-add them
+    props.dbJdbcUrl.grantRead(this.flywayProject);
+    // One would think that the statement below would also make sense. However, the CDK will
+    // error out citing:
+    //
+    // Adding this dependency (SpringBootDemoFoundationStack ->
+    // SpringBootDemoAppDBStack/Flyway/CodeBuildProject/Role/Resource.Arn) would create a
+    // cyclic reference.
+    //
+    // thus, we leave this commented out:
+    // props.dbPassword.grantRead(this.flywayProject);
+
+    this.referenceUtils.addToSecurityGroup({
+      source: this.flywayProject,
+      parameterName: "/env/rds/DemoAppDB",
+      port: Port.tcp(3306),
+      description: "Application access to RDS"
+    });
   }
 }

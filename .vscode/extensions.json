@@ -8,6 +8,7 @@
     "ms-vscode-remote.vscode-remote-extensionpack",
     "vscjava.vscode-java-pack",
     "esbenp.prettier-vscode",
-    "dotdevru.prettier-java"
+    "dotdevru.prettier-java",
+    "dbaeumer.vscode-eslint"
   ]
 }

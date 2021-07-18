@@ -1,7 +1,9 @@
 import * as cdk from "@aws-cdk/core";
-import * as ec2 from "@aws-cdk/aws-ec2";
 import { IConstruct } from "@aws-cdk/core";
+import * as ec2 from "@aws-cdk/aws-ec2";
 import { ISecurityGroup } from "@aws-cdk/aws-ec2";
+import { ParameterType, StringParameter } from "@aws-cdk/aws-ssm";
+import { ParamNames } from "./names";
 
 /**
  *
@@ -34,6 +36,13 @@ export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
       maxAzs: 2
     });
 
+    new StringParameter(this, "VpcIdParam", {
+      description: "",
+      parameterName: ParamNames.VPC_ID,
+      stringValue: this.vpc.vpcId,
+      type: ParameterType.STRING
+    });
+
     this.gatewayEndpoints = [];
     this.interfaceEndpoints = [];
 
@@ -55,11 +64,11 @@ export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
     );
   }
 
-  addInterfaceEndpoints(...services: ec2.InterfaceVpcEndpointAwsService[]) {
-    for (let service of services) {
+  addInterfaceEndpoints(...services: ec2.InterfaceVpcEndpointAwsService[]): void {
+    for (const service of services) {
       const serviceId = service.name.split(".").pop() as string;
       const endpoint = this.vpc.addInterfaceEndpoint(serviceId, {
-        service: service
+        service
       });
       this.interfaceEndpoints.push(endpoint);
     }
@@ -69,8 +78,8 @@ export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
     return service.name.split(".").pop() as string;
   }
 
-  addEgressToVpcServiceEndpoint(securityGroup: ISecurityGroup) {
-    for (let service of this.interfaceEndpoints) {
+  addEgressToVpcServiceEndpoint(securityGroup: ISecurityGroup): void {
+    for (const service of this.interfaceEndpoints) {
       securityGroup.connections.allowTo(service, ec2.Port.tcp(443));
     }
   }

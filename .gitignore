@@ -35,7 +35,8 @@ out/
 /nbdist/
 /.nb-gradle/
 test/__snapshots__
-*.js
+lib/*.js
+bin/*.js
 !jest.config.js
 *.d.ts
 node_modules

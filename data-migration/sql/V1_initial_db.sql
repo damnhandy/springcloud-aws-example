@@ -12,6 +12,11 @@ CREATE TABLE if not exists cars (
     CONSTRAINT pk_id PRIMARY KEY  (id)
 );
 
+CREATE USER '${flyway:appuser.username}'@'localhost'
+    IDENTIFIED BY '${flyway:appuser.password}' REQUIRE SSL;
+
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE,CREATE TEMPORARY TABLES, EXECUTE ON demoapp.* TO '${flyway:appuser.username}'@'%';
+
 INSERT INTO cars(id,make,model,model_year,color,description) VALUES (1,'Hyundai','Genesis Coupe',2010,'Orange','ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae donec pharetra magna vestibulum aliquet ultrices erat tortor sollicitudin mi sit amet lobortis sapien sapien non mi integer ac neque duis bibendum morbi non quam nec dui luctus rutrum nulla tellus in sagittis dui vel nisl duis ac nibh');
 INSERT INTO cars(id,make,model,model_year,color,description) VALUES (2,'Subaru','Legacy',2011,'Crimson','cubilia curae donec pharetra magna vestibulum aliquet ultrices erat tortor sollicitudin mi sit amet lobortis sapien sapien non mi');
 INSERT INTO cars(id,make,model,model_year,color,description) VALUES (3,'Bentley','Continental Flying Spur',2012,'Teal','a feugiat et eros vestibulum ac est lacinia nisi venenatis tristique fusce congue diam id ornare imperdiet sapien urna pretium nisl ut volutpat sapien arcu sed augue aliquam erat volutpat in congue etiam justo etiam pretium iaculis justo in hac habitasse platea dictumst etiam faucibus cursus urna ut tellus nulla ut erat id mauris vulputate elementum nullam varius nulla facilisi cras non velit nec nisi vulputate nonummy maecenas tincidunt lacus at velit vivamus vel nulla eget eros elementum pellentesque quisque porta volutpat erat quisque erat eros viverra eget congue eget semper rutrum nulla nunc purus phasellus in felis donec semper sapien a libero nam dui proin leo odio porttitor id consequat in consequat ut nulla sed accumsan felis ut at dolor quis odio consequat varius integer ac leo pellentesque ultrices mattis odio donec vitae nisi nam ultrices libero non mattis pulvinar nulla pede ullamcorper augue a suscipit nulla elit ac nulla sed vel enim sit amet nunc viverra dapibus nulla suscipit ligula in lacus curabitur at ipsum ac tellus semper interdum mauris ullamcorper purus sit amet nulla quisque arcu libero rutrum ac lobortis vel dapibus at diam nam tristique tortor eu');

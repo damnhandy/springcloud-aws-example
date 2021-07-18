@@ -1,17 +1,22 @@
 import * as cdk from "@aws-cdk/core";
 import * as ec2 from "@aws-cdk/aws-ec2";
-import { InstanceClass, InstanceSize, InstanceType } from "@aws-cdk/aws-ec2";
-import { FoundationStack } from "./foundation-stack";
+import { InstanceClass, InstanceSize, InstanceType, IVpc } from "@aws-cdk/aws-ec2";
 import * as rds from "@aws-cdk/aws-rds";
 import { IDatabaseCluster } from "@aws-cdk/aws-rds";
 import * as ssm from "@aws-cdk/aws-ssm";
-import { IStringParameter } from "@aws-cdk/aws-ssm";
+import { IStringParameter, StringParameter } from "@aws-cdk/aws-ssm";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
+import { IKey } from "@aws-cdk/aws-kms";
+import * as s3 from "@aws-cdk/aws-s3";
+import { IRepository } from "@aws-cdk/aws-ecr";
 import { FlywayProject } from "./flyway-project";
+import { ParamNames } from "./names";
+import { ReferenceUtils } from "./utils";
 
 export interface DatabaseStackProps extends cdk.StackProps {
-  readonly foundationStack: FoundationStack;
+  readonly vpc: IVpc;
   readonly serviceName: string;
+  readonly databaseName: string;
   readonly appuserSecretName: string;
   readonly revision: string;
 }
@@ -19,28 +24,50 @@ export interface DatabaseStackProps extends cdk.StackProps {
 export class DatabaseStack extends cdk.Stack {
   public mysql_cluster: IDatabaseCluster;
   public dbUrl: IStringParameter;
-  public dbUsername: IStringParameter;
+  public dbAdminUsername: IStringParameter;
   public dbAdminCreds: ISecret;
   public appUserCreds: ISecret;
+  public databaseName: string;
+  kmsKey: IKey;
+  artifactsBucket: s3.IBucket;
+  referenceUtils: ReferenceUtils;
+  flywayRepo: IRepository;
 
   constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
-    const prefix = "DemoAppDB";
-    const dbUsername = "admin";
 
-    this.dbAdminCreds = new rds.DatabaseSecret(this, `${prefix}AdminCreds`, {
-      secretName: `/secret/mysql/admin`,
+    this.referenceUtils = new ReferenceUtils(this, "RefUtil");
+    const dbUsername = "admin";
+    this.databaseName = props.databaseName;
+    this.kmsKey = this.referenceUtils.findKmsKeyByParam(
+      StringParameter.fromStringParameterName(this, "KmsRef", ParamNames.KMS_ARN)
+    );
+
+    this.artifactsBucket = this.referenceUtils.findBucketByParam(
+      StringParameter.fromStringParameterName(this, "BucketRef", ParamNames.ARTIFACTS_BUCKET_ARN)
+    );
+
+    this.flywayRepo = this.referenceUtils.findEcrRepoByParam(
+      StringParameter.fromStringParameterName(
+        this,
+        "FlywatRepoRef",
+        ParamNames.FLYWAY_ECR_REPO_NAME
+      )
+    );
+
+    this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
+      secretName: ParamNames.MYSQL_ADMIN_SECRET,
       username: dbUsername,
-      encryptionKey: props.foundationStack.kmsKey
+      encryptionKey: this.kmsKey
     });
 
-    this.appUserCreds = new rds.DatabaseSecret(this, `${prefix}AppuserAdminCreds`, {
+    this.appUserCreds = new rds.DatabaseSecret(this, "AppuserAdminCreds", {
       secretName: props.appuserSecretName,
       username: "appuser",
-      encryptionKey: props.foundationStack.kmsKey
+      encryptionKey: this.kmsKey
     });
 
-    const parameter_group = new rds.ParameterGroup(this, `${prefix}ParameterGroup`, {
+    const parameter_group = new rds.ParameterGroup(this, "DBParameterGroup", {
       engine: rds.DatabaseClusterEngine.auroraMysql({
         version: rds.AuroraMysqlEngineVersion.VER_2_07_2
       }),
@@ -50,68 +77,75 @@ export class DatabaseStack extends cdk.Stack {
       }
     });
 
-    this.mysql_cluster = new rds.DatabaseCluster(this, `${prefix}Cluster`, {
-      defaultDatabaseName: `${prefix}`,
+    this.mysql_cluster = new rds.DatabaseCluster(this, "DBCluster", {
+      defaultDatabaseName: this.databaseName,
       parameterGroup: parameter_group,
-      storageEncryptionKey: props.foundationStack.kmsKey,
+      storageEncryptionKey: this.kmsKey,
       credentials: rds.Credentials.fromSecret(this.dbAdminCreds),
       engine: rds.DatabaseClusterEngine.AURORA_MYSQL,
-      s3ImportBuckets: [props.foundationStack.artifactsBucket],
+      s3ImportBuckets: [this.artifactsBucket],
       instanceProps: {
         instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.SMALL),
-        vpc: props.foundationStack.networking.vpc,
+        vpc: props.vpc,
         vpcSubnets: {
           subnetType: ec2.SubnetType.PRIVATE
         }
-      }
+      },
+      deletionProtection: false
     });
+
     this.appUserCreds.attach(this.mysql_cluster);
 
-    new ssm.StringParameter(this, `${prefix}SecurityGroupId`, {
-      parameterName: `/env/rds/${prefix}`,
+    new ssm.StringParameter(this, "SecurityGroupId", {
+      parameterName: ParamNames.MYSQL_SG_ID,
       stringValue: this.mysql_cluster.connections.securityGroups[0].securityGroupId
     });
 
-    new ssm.StringParameter(this, `${prefix}HostNameSSMParam`, {
-      parameterName: `/config/${props.serviceName}/jdbc/hostname`,
+    new ssm.StringParameter(this, "HostNameSSMParam", {
+      parameterName: ParamNames.JDBC_HOSTNAME,
       stringValue: this.mysql_cluster.clusterEndpoint.hostname
+    });
+
+    new ssm.StringParameter(this, "ReaderHostNameSSMParam", {
+      parameterName: ParamNames.JDBC_READER_HOSTNAME,
+      stringValue: this.mysql_cluster.clusterReadEndpoint.hostname
     });
 
     // hard coding the value for now. this.mysql_cluster.clusterEndpoint.port returns a number,
     // calling toString() renders float and not a reference to the RDS port value of the endpoint
-    new ssm.StringParameter(this, `${prefix}PortSSMParam`, {
-      parameterName: `/config/${props.serviceName}/jdbc/port`,
+    new ssm.StringParameter(this, "PortSSMParam", {
+      parameterName: ParamNames.JDBC_PORT,
       stringValue: "3306"
     });
 
-    this.dbUsername = new ssm.StringParameter(this, `${prefix}DBAdminUsername`, {
-      parameterName: `/config/shared/admin/username`,
+    this.dbAdminUsername = new ssm.StringParameter(this, "DBAdminUsername", {
+      parameterName: ParamNames.MYSQL_ADMIN_SECRET,
       stringValue: dbUsername
     });
 
-    this.dbUrl = new ssm.StringParameter(this, `${prefix}JdbcUrlSSMParam`, {
-      parameterName: `/config/${props.serviceName}/jdbc/url`,
+    this.dbUrl = new ssm.StringParameter(this, "JdbcUrlSSMParam", {
+      parameterName: ParamNames.JDBC_URL,
       stringValue: buildJdbcUrl(this.mysql_cluster)
     });
 
     function buildJdbcUrl(mysql_cluster: rds.IDatabaseCluster): string {
-      let jdbcUrl = `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/demoapp`;
+      const jdbcUrl = `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/${props.databaseName}`;
       return jdbcUrl;
     }
 
     new FlywayProject(this, "Flyway", {
       env: props.env,
-      networking: props.foundationStack.networking,
+      vpc: props.vpc,
       dbJdbcUrl: this.dbUrl,
-      dbPassword: this.dbAdminCreds,
-      dbUsername: this.dbUsername,
+      dbAdminSecret: this.dbAdminCreds,
+      dbAppUser: this.appUserCreds,
       destinationKeyPrefix: "data-jobs",
       destinationFileName: "data-migration.zip",
-      kmsKey: props.foundationStack.kmsKey,
+      kmsKey: this.kmsKey,
       prefix: "app",
-      sourceBucket: props.foundationStack.artifactsBucket,
+      sourceBucket: this.artifactsBucket,
       sourceZipPath: "../data-migration-out",
-      flywayImageRepo: props.foundationStack.flywayRepo,
+      flywayImageRepo: this.flywayRepo,
       revision: props.revision
     });
   }
