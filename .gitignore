@@ -35,8 +35,8 @@ out/
 /nbdist/
 /.nb-gradle/
 test/__snapshots__
-lib/*.js
-bin/*.js
+*.js
+lambdas/**.js
 !jest.config.js
 *.d.ts
 node_modules
@@ -47,4 +47,4 @@ cdk.out
 cdk.context.json
 .cdk.staging
 credentials/
-*.js
+
