@@ -5,6 +5,14 @@ aws:
     enabled: true
     default-context: "shared"
     name: ${spring.application.name}
+server:
+  undertow:
+    accesslog:
+      enabled: true
+      rotate: false
+      directory: /dev
+      prefix: stdout
+      suffix: ""
 spring:
   application:
     name: demoapp
