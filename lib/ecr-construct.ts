@@ -13,15 +13,28 @@ export interface EcrRepoProps extends cdk.StackProps {
    * The name of the repo
    */
   readonly repositoryName: string;
+  /**
+   * If the repo is going to be called by CodeBuild, adds and ECR policy that permits
+   * CodeBuild to pull images from it.
+   */
   readonly withCodeBuildPolicy: boolean;
+  /**
+   * The number of untagged images to retain, the default is 20.
+   */
   readonly maxImageCount?: number;
+  /**
+   * The number of days an image can remain the repo. The default is 120-days.
+   */
   readonly maxImageAge?: number;
 }
 
 /**
- * Simple
+ * Simple construct that defines and ECR repo with pre-defined policies such as:
+ * - ensuring that image scanning is enabled
+ * - deleting images that are n-days old
+ * - removing any untagged images when that number reaches a specific threshold.
  */
-export class EcrRepo extends Construct {
+export class EcrRepoWithLifecyle extends Construct {
   public repository: ecr.IRepository;
   props: EcrRepoProps;
   constructor(scope: Construct, id: string, props: EcrRepoProps) {
@@ -31,7 +44,7 @@ export class EcrRepo extends Construct {
     this.repository = new ecr.Repository(this, "ECRRepo", {
       repositoryName: this.props.repositoryName,
       imageScanOnPush: true,
-      removalPolicy: RemovalPolicy.SNAPSHOT,
+      removalPolicy: RemovalPolicy.DESTROY, // this is an ill-advised policy for production apps
       lifecycleRules: [
         {
           description:
@@ -51,7 +64,6 @@ export class EcrRepo extends Construct {
         }
       ]
     });
-
     // Required for ECR repos that will be used by CodeBuild
     if (this.props.withCodeBuildPolicy) {
       this.repository.addToResourcePolicy(

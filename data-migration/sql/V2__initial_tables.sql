@@ -1,21 +1,15 @@
-CREATE DATABASE IF NOT EXISTS demoapp;
-
-USE demoapp;
 
 CREATE TABLE if not exists cars (
-    id          INT NOT NULL,
-    make        VARCHAR(100) NOT NULL,
-    model       VARCHAR(100) NOT NULL,
-    model_year  YEAR(4) NOT NULL,
-    color       VARCHAR(40) NOT NULL,
-    description TEXT NOT NULL,
-    CONSTRAINT pk_id PRIMARY KEY  (id)
+                                    id          INT NOT NULL,
+                                    make        VARCHAR(100) NOT NULL,
+                                    model       VARCHAR(100) NOT NULL,
+                                    model_year  YEAR NOT NULL,
+                                    color       VARCHAR(40) NOT NULL,
+                                    description TEXT NOT NULL,
+                                    CONSTRAINT pk_id PRIMARY KEY  (id)
 );
 
-CREATE USER '${flyway:appuser.username}'@'localhost'
-    IDENTIFIED BY '${flyway:appuser.password}' REQUIRE SSL;
 
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE,CREATE TEMPORARY TABLES, EXECUTE ON demoapp.* TO '${flyway:appuser.username}'@'%';
 
 INSERT INTO cars(id,make,model,model_year,color,description) VALUES (1,'Hyundai','Genesis Coupe',2010,'Orange','ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae donec pharetra magna vestibulum aliquet ultrices erat tortor sollicitudin mi sit amet lobortis sapien sapien non mi integer ac neque duis bibendum morbi non quam nec dui luctus rutrum nulla tellus in sagittis dui vel nisl duis ac nibh');
 INSERT INTO cars(id,make,model,model_year,color,description) VALUES (2,'Subaru','Legacy',2011,'Crimson','cubilia curae donec pharetra magna vestibulum aliquet ultrices erat tortor sollicitudin mi sit amet lobortis sapien sapien non mi');

@@ -2,7 +2,11 @@ import * as cdk from "@aws-cdk/core";
 import { RemovalPolicy } from "@aws-cdk/core";
 import { IRepository } from "@aws-cdk/aws-ecr";
 import { DockerImageAsset } from "@aws-cdk/aws-ecr-assets";
-import { Protocol } from "@aws-cdk/aws-elasticloadbalancingv2";
+import {
+  ApplicationProtocol,
+  ApplicationProtocolVersion,
+  Protocol
+} from "@aws-cdk/aws-elasticloadbalancingv2";
 import * as ecs from "@aws-cdk/aws-ecs";
 import { LogDriver } from "@aws-cdk/aws-ecs";
 import { ApplicationLoadBalancedFargateService } from "@aws-cdk/aws-ecs-patterns";
@@ -16,6 +20,8 @@ import { StringParameter } from "@aws-cdk/aws-ssm";
 import { IKey } from "@aws-cdk/aws-kms";
 import { ReferenceUtils } from "./utils";
 import { ParamNames } from "./names";
+import * as s3deploy from "@aws-cdk/aws-s3-deployment";
+import * as s3 from "@aws-cdk/aws-s3";
 
 /**
  *
@@ -24,6 +30,10 @@ export interface ApplicationStackProps extends cdk.StackProps {
   readonly vpc: IVpc;
   readonly serviceName: string;
   readonly revision: string;
+  readonly artifactsBucket: s3.IBucket;
+  readonly destinationKeyPrefix: string;
+  readonly destinationFileName: string;
+  readonly sourceZipPath: string;
 }
 
 /**
@@ -48,6 +58,12 @@ export class ApplicationStack extends cdk.Stack {
       StringParameter.fromStringParameterName(this, "KmsRef2", ParamNames.KMS_ARN)
     );
 
+    const sqlDataDeployment = new s3deploy.BucketDeployment(this, "CopySQLData", {
+      sources: [s3deploy.Source.asset(path.resolve(__dirname, props.sourceZipPath))],
+      destinationBucket: props.artifactsBucket,
+      destinationKeyPrefix: props.destinationKeyPrefix
+    });
+
     const appUserCredentials = Secret.fromSecretNameV2(
       this,
       "AppUserSecret",
@@ -58,6 +74,8 @@ export class ApplicationStack extends cdk.Stack {
       vpc: this.vpc,
       containerInsights: true
     });
+    // Ensure that the S3 deployment happens BEFORE the creation of the ECS resources
+    cluster.node.addDependency(sqlDataDeployment);
 
     const dockerImageAsset = new DockerImageAsset(this, "DemoAppContainerAsset", {
       directory: path.resolve(__dirname, "../springboot-app")
@@ -96,11 +114,15 @@ export class ApplicationStack extends cdk.Stack {
             "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
         }
       },
+      protocol: ApplicationProtocol.HTTP,
+      protocolVersion: ApplicationProtocolVersion.HTTP1,
       memoryLimitMiB: 1024,
       publicLoadBalancer: true,
       listenerPort: 8080
     });
-
+    ecsService.taskDefinition.defaultContainer?.addPortMappings({
+      containerPort: 8081
+    });
     ecsService.targetGroup.configureHealthCheck({
       path: "/actuator/health/liveness",
       port: "8081",

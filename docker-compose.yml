@@ -44,17 +44,17 @@ services:
     restart: always
     environment:
       MYSQL_DATABASE: demoapp
-      MYSQL_USER: appuser
-      MYSQL_USER_HOST: 172.0.0.0/255.0.0.0
-      MYSQL_PASSWORD_FILE: /run/secrets/appuser_password
+#      MYSQL_USER: appuser
+#      MYSQL_PASSWORD_FILE: /run/secrets/appuser_password
+#      MYSQL_USER_HOST: 172.0.0.0/255.0.0.0
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/root_password
       MYSQL_ROOT_HOST: 172.0.0.0/255.0.0.0
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
-    volumes:
-      - ./data/sql/V1_initial_db.sql:/docker-entrypoint-initdb.d/V1_initial_db.sql
+#    volumes:
+#      - ./data/sql/V1__initial.sql:/docker-entrypoint-initdb.d/V1__initial.sql
     secrets:
       - source: root_password
       - source: appuser_password

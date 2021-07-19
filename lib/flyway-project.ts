@@ -12,6 +12,7 @@ import {
 import * as path from "path";
 import { IKey } from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";
+import { EventType } from "@aws-cdk/aws-s3";
 import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
 import * as ssm from "@aws-cdk/aws-ssm";
@@ -22,10 +23,10 @@ import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
 import * as lambda from "@aws-cdk/aws-lambda";
-import { ReferenceUtils } from "./utils";
 import { ParamNames } from "./names";
 import { NodejsFunction } from "@aws-cdk/aws-lambda-nodejs";
 import { Effect, PolicyStatement } from "@aws-cdk/aws-iam";
+import { LambdaDestination } from "@aws-cdk/aws-s3-notifications";
 
 export interface FlywayProjectProps extends cdk.StackProps {
   readonly vpc: IVpc;
@@ -48,19 +49,11 @@ export class FlywayProject extends Construct {
   kmsKey: IKey;
   securityGroup: ISecurityGroup;
   flywayProject: IProject;
-  referenceUtils: ReferenceUtils;
 
   constructor(scope: Construct, id: string, props: FlywayProjectProps) {
     super(scope, id);
     this.vpc = props.vpc;
     this.kmsKey = props.kmsKey;
-    this.referenceUtils = new ReferenceUtils(this, "RefUtil");
-
-    new s3deploy.BucketDeployment(this, "CopySQLData", {
-      sources: [s3deploy.Source.asset(path.resolve(__dirname, props.sourceZipPath))],
-      destinationBucket: props.sourceBucket,
-      destinationKeyPrefix: props.destinationKeyPrefix
-    });
 
     this.securityGroup = new ec2.SecurityGroup(this, "ProjectSecurityGroup", {
       allowAllOutbound: true,
@@ -69,40 +62,18 @@ export class FlywayProject extends Construct {
       vpc: this.vpc
     });
 
-    const flywayContainer = new ecr_assets.DockerImageAsset(this, "FlywayContainerAsset", {
-      directory: path.resolve(__dirname, "../flyway-container")
-    });
-
-    new ecrdeploy.ECRDeployment(this, "FlywayImageDeploymentTagged", {
-      src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
-      dest: new ecrdeploy.DockerImageName(
-        `${props.flywayImageRepo.repositoryUri}:${props.revision}`
-      )
-    });
-
-    new ecrdeploy.ECRDeployment(this, "FlywayImageDeploymentLatestTag", {
-      src: new ecrdeploy.DockerImageName(flywayContainer.imageUri),
-      dest: new ecrdeploy.DockerImageName(`${props.flywayImageRepo.repositoryUri}:latest`)
-    });
-
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       encryptionKey: this.kmsKey,
       retention: RetentionDays.ONE_WEEK,
       removalPolicy: RemovalPolicy.RETAIN
     });
 
-    // const s3EventSource = new S3EventSource(props.sourceBucket, {
-    //   events: [s3.EventType.OBJECT_CREATED, s3.EventType.OBJECT_CREATED_PUT],
-    //   filters: [{ prefix: "data-jobs/" }]
-    // });
-    // codebuildTrigger.addEventSource(s3EventSource);
-
     this.flywayProject = new cb.Project(this, "CodeBuildProject", {
       vpc: this.vpc,
       logging: {
         cloudWatch: {
           prefix: "flyway",
-          logGroup,
+          logGroup: logGroup,
           enabled: true
         }
       },
@@ -165,11 +136,11 @@ export class FlywayProject extends Construct {
       memorySize: 1024,
       timeout: cdk.Duration.seconds(5),
       runtime: lambda.Runtime.NODEJS_14_X,
-      handler: "main",
+      handler: "handler",
       entry: path.join(__dirname, "../lambdas/codebuild-trigger/s3-trigger.ts"),
       environment: {
-        BUCKET: props.sourceBucket.bucketName,
-        KEY: `${props.destinationKeyPrefix}/${props.destinationFileName}`,
+        TARGET_BUCKET: props.sourceBucket.bucketName,
+        TARGET_KEY: `${props.destinationKeyPrefix}/${props.destinationFileName}`,
         PROJECT_NAME: this.flywayProject.projectName
       },
       bundling: {
@@ -184,6 +155,14 @@ export class FlywayProject extends Construct {
         actions: ["codebuild:StartBuild"],
         resources: [this.flywayProject.projectArn]
       })
+    );
+    props.sourceBucket.addEventNotification(
+      EventType.OBJECT_CREATED_PUT,
+      new LambdaDestination(codebuildTrigger)
+    );
+    props.sourceBucket.addEventNotification(
+      EventType.OBJECT_CREATED_POST,
+      new LambdaDestination(codebuildTrigger)
     );
   }
 }

@@ -6,6 +6,7 @@ env:
     # Needed on 1st run
     # https://flywaydb.org/documentation/configuration/parameters/baselineOnMigrate
     FLYWAY_BASELINE_ON_MIGRATE: true
+    FLYWAY_SCHEMAS: demoapp
 phases:
   install:
     runtime-versions:
@@ -26,10 +27,11 @@ phases:
       - export FLYWAY_PASSWORD=$(echo "${ADMIN_CREDS}" | jq -r .password)
       - export FLYWAY_URL="${FLYWAY_URL}?sslMode=VERIFY_IDENTITY&enabledTLSProtocols=TLSv1.2&trustCertificateKeyStoreType=PKCS12"
       - export FLYWAY_URL="${FLYWAY_URL}&trustCertificateKeyStorePassword=changeit&trustCertificateKeyStoreUrl=file:/opt/flyway/jdbc_truststore.p12&serverTimezone=UTC"
-      - export FLYWAY_PLACEHOLDER_APPUSER_USERNAME=$(echo "${APP_USER_CREDS}" | jq -r .username)
-      - export FLYWAY_PLACEHOLDER_APPUSER_PASSWORD=$(echo "${APP_USER_CREDS}" | jq -r .password)
+      - export FLYWAY_PLACEHOLDERS_APPUSER=$(echo "${APP_USER_CREDS}" | jq -r .username)
+      - export FLYWAY_PLACEHOLDERS_APPUSERPW=$(echo "${APP_USER_CREDS}" | jq -r .password)
   build:
     on-failure: ABORT
     commands:
-      - flyway info
+      - flyway validate -ignorePendingMigrations=true
       - flyway migrate
+      - flyway info

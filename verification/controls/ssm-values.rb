@@ -5,33 +5,36 @@ control 'Parameter Store Values' do
   impact 0.7 # The criticality, if this control fails.
   title 'Verify that parameter values exist'
   desc 'Checks that the SSM parameters are setup correctly'
-  describe aws_ssm_parameter(name: '/config/demoapp/spring/data/jdbc/hostname') do
+
+  describe aws_ssm_parameter(name: '/config/shared/jdbc/hostname') do
     it { should exist }
     its('type') { should eq 'String' }
     its('data_type') { should eq 'text' }
     its('value') { should_not eq nil }
   end
 
-  describe aws_ssm_parameter(name: '/config/demoapp/spring/data/jdbc/port') do
+  describe aws_ssm_parameter(name: '/config/shared/jdbc/reader-hostname') do
     it { should exist }
     its('type') { should eq 'String' }
     its('data_type') { should eq 'text' }
     its('value') { should_not eq nil }
   end
 
-  describe aws_ssm_parameter(name: '/config/demoapp/spring/data/jdbc/url') do
+  describe aws_ssm_parameter(name: '/config/shared/jdbc/port') do
     it { should exist }
     its('type') { should eq 'String' }
     its('data_type') { should eq 'text' }
     its('value') { should_not eq nil }
   end
 
-  describe aws_ssm_parameter(name: '/config/shared/admin/username') do
+  describe aws_ssm_parameter(name: '/config/shared/jdbc/url') do
     it { should exist }
     its('type') { should eq 'String' }
     its('data_type') { should eq 'text' }
     its('value') { should_not eq nil }
   end
+
+
 end
 
 # At present, inspec-aws does not support Secrets Manager directly, thus, we use the Secrets Manager reference

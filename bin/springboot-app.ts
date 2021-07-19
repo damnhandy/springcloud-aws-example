@@ -2,13 +2,14 @@
 import "source-map-support/register";
 import * as cdk from "@aws-cdk/core";
 import * as cp from "child_process";
-import { DatabaseStack } from "../lib/database-stack";
 import { FoundationStack } from "../lib/foundation-stack";
 import { ApplicationStack } from "../lib/application-stack";
 
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
-
+const destinationKeyPrefix = "data-jobs";
+const destinationFileName = "data-migration.zip";
+const sourceZipPath = "../data-migration-out";
 /**
  *
  */
@@ -22,26 +23,25 @@ const env = {
 const app = new cdk.App();
 
 const foundationStack = new FoundationStack(app, "SpringBootDemoFoundationStack", {
-  env
-});
-
-const databaseStack = new DatabaseStack(app, "SpringBootDemoAppDBStack", {
   env: env,
-  vpc: foundationStack.networking.vpc,
   serviceName: serviceName,
-  databaseName: serviceName,
-  artifactsBucket: foundationStack.artifactsBucket,
+  destinationKeyPrefix: destinationKeyPrefix,
+  destinationFileName: destinationFileName,
+  sourceZipPath: sourceZipPath,
   revision: revision
 });
-databaseStack.addDependency(foundationStack);
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
   env: env,
   vpc: foundationStack.networking.vpc,
   serviceName: serviceName,
+  destinationKeyPrefix: destinationKeyPrefix,
+  destinationFileName: destinationFileName,
+  sourceZipPath: sourceZipPath,
+  artifactsBucket: foundationStack.artifactsBucket,
   revision: revision
 });
-appStack.addDependency(databaseStack);
+appStack.addDependency(foundationStack);
 
 app.synth({
   validateOnSynthesis: true

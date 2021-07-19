@@ -5,9 +5,25 @@ import * as s3 from "@aws-cdk/aws-s3";
 import { IRepository } from "@aws-cdk/aws-ecr";
 import * as iam from "@aws-cdk/aws-iam";
 import { ParameterType, StringParameter } from "@aws-cdk/aws-ssm";
-import { EcrRepo } from "./ecr-construct";
+import { EcrRepoWithLifecyle } from "./ecr-construct";
 import { BasicNetworking, IBasicNetworking } from "./network-construct";
 import { ParamNames } from "./names";
+import { DatabaseConstruct } from "./database-construct";
+
+export interface FoundationStackProps extends cdk.StackProps {
+  /**
+   * The name of the service and its assocated database.
+   */
+  readonly serviceName: string;
+  /**
+   * The revision identifier
+   */
+  readonly revision: string;
+
+  readonly destinationKeyPrefix: string;
+  readonly destinationFileName: string;
+  readonly sourceZipPath: string;
+}
 
 /**
  * Base stack that sets up foundational resources that maintains resources that should not be
@@ -17,11 +33,10 @@ export class FoundationStack extends cdk.Stack {
   public kmsKey: kms.Key;
   public artifactsBucket: s3.IBucket;
   public networking: IBasicNetworking;
-
   public appRepo: IRepository;
   public flywayRepo: IRepository;
 
-  constructor(scope: cdk.Construct, id: string, props: cdk.StackProps) {
+  constructor(scope: cdk.Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
 
     this.networking = new BasicNetworking(this, "VPC");
@@ -63,7 +78,18 @@ export class FoundationStack extends cdk.Stack {
         restrictPublicBuckets: true
       },
       versioned: true,
-      removalPolicy: RemovalPolicy.DESTROY
+      removalPolicy: RemovalPolicy.DESTROY // this is an ill-advised policy for production apps
+    });
+
+    new DatabaseConstruct(this, "DB", {
+      artifactsBucket: this.artifactsBucket,
+      revision: props.revision,
+      serviceName: props.serviceName,
+      vpc: this.networking.vpc,
+      destinationKeyPrefix: props.destinationKeyPrefix,
+      destinationFileName: props.destinationFileName,
+      sourceZipPath: props.sourceZipPath,
+      kmsKey: this.kmsKey
     });
 
     new StringParameter(this, "ArtifactsBucketArnParam", {
@@ -80,7 +106,7 @@ export class FoundationStack extends cdk.Stack {
       type: ParameterType.STRING
     });
 
-    const appRepo = new EcrRepo(this, "DemoAppImageRepo", {
+    const appRepo = new EcrRepoWithLifecyle(this, "DemoAppImageRepo", {
       repositoryName: "apps/demoapp",
       withCodeBuildPolicy: false
     });
@@ -89,17 +115,6 @@ export class FoundationStack extends cdk.Stack {
     new StringParameter(this, "AppRepoParam", {
       parameterName: ParamNames.APP_ECR_REPO_NAME,
       stringValue: this.appRepo.repositoryName
-    });
-
-    const flywayRepo = new EcrRepo(this, "FlywayImageRepo", {
-      repositoryName: "ci/flyway",
-      withCodeBuildPolicy: true
-    });
-    this.flywayRepo = flywayRepo.repository;
-
-    new StringParameter(this, "FlywayRepoParam", {
-      parameterName: ParamNames.FLYWAY_ECR_REPO_NAME,
-      stringValue: this.flywayRepo.repositoryName
     });
   }
 }

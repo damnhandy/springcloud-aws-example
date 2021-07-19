@@ -1,10 +1,10 @@
 import { Stack } from "@aws-cdk/core";
 import "@aws-cdk/assert/jest";
-import { EcrRepo } from "../lib/ecr-construct";
+import { EcrRepoWithLifecyle } from "../lib/ecr-construct";
 
 test("create ecr repo without codebuild permissions", () => {
   const stack = new Stack();
-  new EcrRepo(stack, "DemoAppImageRepo", {
+  new EcrRepoWithLifecyle(stack, "DemoAppImageRepo", {
     repositoryName: "apps/demoapp",
     withCodeBuildPolicy: false
   });
@@ -18,7 +18,7 @@ test("create ecr repo without codebuild permissions", () => {
 
 test("create ecr repo with codebuild permissions", () => {
   const stack = new Stack();
-  new EcrRepo(stack, "DemoAppImageRepo", {
+  new EcrRepoWithLifecyle(stack, "DemoAppImageRepo", {
     repositoryName: "apps/demoapp",
     withCodeBuildPolicy: true
   });

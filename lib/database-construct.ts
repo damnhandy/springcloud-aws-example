@@ -15,43 +15,33 @@ import { ReferenceUtils } from "./utils";
 
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly vpc: IVpc;
+  readonly kmsKey: IKey;
   readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
-  readonly databaseName: string;
   readonly revision: string;
+  readonly destinationKeyPrefix: string;
+  readonly destinationFileName: string;
+  readonly sourceZipPath: string;
 }
 
-export class DatabaseStack extends cdk.Stack {
+export class DatabaseConstruct extends cdk.Construct {
   public mysql_cluster: IDatabaseCluster;
   public dbUrl: IStringParameter;
   public dbAdminUsername: IStringParameter;
   public dbAdminCreds: ISecret;
   public appUserCreds: ISecret;
-  public databaseName: string;
   kmsKey: IKey;
   artifactsBucket: s3.IBucket;
   referenceUtils: ReferenceUtils;
   flywayRepo: IRepository;
 
   constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
-    super(scope, id, props);
+    super(scope, id);
     this.artifactsBucket = props.artifactsBucket;
     this.referenceUtils = new ReferenceUtils(this, "RefUtil");
-
     const dbUsername = "admin";
-    this.databaseName = props.databaseName;
 
-    this.kmsKey = this.referenceUtils.findKmsKeyByParam(
-      StringParameter.fromStringParameterName(this, "KmsRef", ParamNames.KMS_ARN)
-    );
-
-    this.flywayRepo = this.referenceUtils.findEcrRepoByParam(
-      StringParameter.fromStringParameterName(
-        this,
-        "FlywatRepoRef",
-        ParamNames.FLYWAY_ECR_REPO_NAME
-      )
-    );
+    this.kmsKey = props.kmsKey;
 
     this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
       secretName: ParamNames.MYSQL_ADMIN_SECRET,
@@ -76,7 +66,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     this.mysql_cluster = new rds.DatabaseCluster(this, "DBCluster", {
-      defaultDatabaseName: this.databaseName,
+      defaultDatabaseName: props.serviceName,
       parameterGroup: parameter_group,
       storageEncryptionKey: this.kmsKey,
       credentials: rds.Credentials.fromSecret(this.dbAdminCreds),
@@ -93,11 +83,6 @@ export class DatabaseStack extends cdk.Stack {
       deletionProtection: false
     });
 
-    // this.mysql_cluster.connections.allowFrom(
-    //   Peer.ipv4(props.vpc.vpcCidrBlock),
-    //   Port.tcp(3306),
-    //   "Allow from within VPC"
-    // );
     this.appUserCreds.attach(this.mysql_cluster);
 
     new ssm.StringParameter(this, "SecurityGroupId", {
@@ -133,8 +118,7 @@ export class DatabaseStack extends cdk.Stack {
     });
 
     function buildJdbcUrl(mysql_cluster: rds.IDatabaseCluster): string {
-      const jdbcUrl = `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/${props.databaseName}`;
-      return jdbcUrl;
+      return `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/${props.serviceName}`;
     }
 
     new FlywayProject(this, "Flyway", {
@@ -143,12 +127,12 @@ export class DatabaseStack extends cdk.Stack {
       dbJdbcUrl: this.dbUrl,
       dbAdminSecret: this.dbAdminCreds,
       dbAppUser: this.appUserCreds,
-      destinationKeyPrefix: "data-jobs",
-      destinationFileName: "data-migration.zip",
+      destinationKeyPrefix: props.destinationKeyPrefix,
+      destinationFileName: props.destinationFileName,
+      sourceZipPath: props.sourceZipPath,
       kmsKey: this.kmsKey,
       prefix: "app",
       sourceBucket: this.artifactsBucket,
-      sourceZipPath: "../data-migration-out",
       flywayImageRepo: this.flywayRepo,
       mysqlSecurityGroup: this.mysql_cluster.connections.securityGroups[0],
       revision: props.revision
