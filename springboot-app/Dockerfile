@@ -60,10 +60,10 @@ FROM scratch
 COPY --from=builder /chroot/app /
 COPY --from=builder --chown=appuser:appuser /opt/project/build/image/ /opt/app/
 # Creating symlinks to /dev/stdout so that all logs are sent to the containers logstream.
-RUN mkdir -p /var/log/demoapp && \
-    ln -s /dev/stdout /var/log/demoapp/access_log && \
-    ln -s /dev/stdout /var/log/demoapp/access_log_management && \
-    chown -R appuser:appuser /var/log/demoapp
+RUN mkdir -p /var/log/demoapp \
+  && ln -s /dev/stdout /var/log/demoapp/access_log \
+  && ln -s /dev/stdout /var/log/demoapp/access_log_management \
+  && chown -R appuser:appuser /var/log/demoapp
 ENV LANG=en_US.UTF-8 \
   LANGUAGE=en_US:en \
   LC_ALL=en_US.UTF-8 \

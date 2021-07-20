@@ -4,6 +4,29 @@ This is a small sample application that uses a SpringBoot service with Spring Cl
 certain configuration elements. Additionally, it uses the AWS Cloud Development Kit (CDK) to
 provision the AWS resources that the application needs in order to deploy into AWS.
 
+## Objectives
+
+This project defines a simple SpringBoot service that connects to a MySQL datatbase. The deployment
+will handle the provisioning of credentials, such as passwords and certificates. The application
+will resolve the credentials differently depending on the environment it was deployed to. The
+SpringBoot application uses Spring profiles to determine the right strategy. When using the `local`
+or `docker` profiles, it will use the Spring
+[`configtree`](https://docs.spring.io/spring-boot/docs/current/reference/html/features.html#features.external-config.files.configtree)
+to resolve the credentials. In AWS, the `aws` profile is used and the
+[Spring Cloud AWS library](https://docs.awspring.io/spring-cloud-aws/docs/2.3.0-RC1/reference/html/index.html#integrating-your-spring-cloud-application-with-the-aws-secrets-manager)
+handles the resolution of secrets.
+
+When deployed to AWS, a codebuild job is uses to populate the database using the
+[Flyway CLI](https://flywaydb.org/documentation/command/migrate). A
+[Lambda trigger](lambdas/codebuild-trigger/s3-trigger.ts) is used to trigger the CodeBuild project
+whenever the `data-migration.zip` file is uploaded to S3. When running under Docker Compose, we
+leverage the MySQL containers bootstrap mechanism to create the table and provision the data.
+
+## Strategy
+
+THis project is structured as a single project that builds and deploys all assets when deployed to
+either docker compose or in AWS.
+
 ## Provisioning Secrets for local development.
 
 A key element of this project is to promote proper credential handling. As such, the project
@@ -36,7 +59,7 @@ application via an IDE on the Host OS. In order to do this, run the following:
     $ ./prepare_credentials.sh
     $ docker compose up mysql
 
-More details TBD.
+In your IDE, use the `local` profile to connect to the database.
 
 ## Local Deployment with Docker Compose
 
@@ -66,3 +89,11 @@ Before deploying to AWS, run the build target:
 And then synthesize the stack by running:
 
     npx cdk synth
+
+And finally deploy the stack:
+
+    npx cdk deploy --all
+
+or if you don't want to deal with the prompts, run:
+
+    npm run deploy

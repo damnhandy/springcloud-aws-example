@@ -13,6 +13,7 @@ server:
       file-date-format:
       prefix: "access_log"
       suffix:
+  # ensures that you'll get the x-forwarded headers form the ALB
   forward-headers-strategy: native
 spring:
   application:
