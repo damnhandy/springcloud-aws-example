@@ -9,10 +9,10 @@ server:
   undertow:
     accesslog:
       enabled: true
-      dir: "/dev"
-      file-date-format: ""
-      prefix: "stdout"
-      suffix: ""
+      dir: "/var/log/demoapp"
+      file-date-format:
+      prefix: "access_log"
+      suffix:
 spring:
   application:
     name: demoapp
@@ -56,3 +56,8 @@ management:
     health:
       probes:
         enabled: true
+    info:
+      enabled:
+    logfile:
+      enabled: true
+      external-file: /var/log/demoapp/access_log_management

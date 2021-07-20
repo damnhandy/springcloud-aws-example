@@ -124,11 +124,13 @@ export class ApplicationStack extends cdk.Stack {
     ecsService.taskDefinition.defaultContainer?.addPortMappings({
       containerPort: 8081
     });
+    // https://spring.io/blog/2020/03/25/liveness-and-readiness-probes-with-spring-boot
     ecsService.targetGroup.configureHealthCheck({
-      path: "/actuator/health/liveness",
+      path: "/actuator/health/readiness",
       port: "8081",
       protocol: Protocol.HTTP,
-      healthyHttpCodes: "200"
+      healthyHttpCodes: "200",
+      enabled: true
     });
     ecsService.loadBalancer.connections.allowTo(
       ecsService.service,

@@ -47,17 +47,22 @@ To run the stack locally, simply run the following commands:
     $ docker compose up
 
 This will build the container with the SpringBoot application and then launch the MySQL database and
-SpringBoot application.
+SpringBoot application. The `depends_on` attribute of Docker Compose does not actually force the
+SpringBoot app to wait until the MySQL instance is ready for requests. Upon running the stack for
+the first time, it is normal to see the SpringBoot app fail connecting to MySQL in the forst few
+attempts. The SpringBoot app has a `restart` policy of `always` which will restart the app on
+failure. Eventually, the application will stabilize and you should be able to hit the following
+URIs:
+
+http://localhost:8080/cars/11 http://localhost:8081/actuator/info
+http://localhost:8081/actuator/health
 
 ## AWS CDK Deployment
 
-TBD
+Before deploying to AWS, run the build target:
 
-## Useful CDK commands
+    npm run build
 
-- `npm run build` compile typescript to js
-- `npm run watch` watch for changes and compile
-- `npm run test` perform the jest unit tests
-- `cdk deploy` deploy this stack to your default AWS account/region
-- `cdk diff` compare deployed stack with current state
-- `cdk synth` emits the synthesized CloudFormation template
+And then synthesize the stack by running:
+
+    npx cdk synth
