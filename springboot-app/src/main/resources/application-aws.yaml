@@ -6,8 +6,6 @@ aws:
     default-context: "shared"
     name: "${spring.application.name}"
 server:
-  http2:
-    enabled: true
   undertow:
     accesslog:
       enabled: true
