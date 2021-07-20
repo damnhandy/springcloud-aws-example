@@ -77,15 +77,24 @@ export class ApplicationStack extends cdk.Stack {
     // Ensure that the S3 deployment happens BEFORE the creation of the ECS resources
     cluster.node.addDependency(sqlDataDeployment);
 
+    // Creates the DockerImageAsset, which will then be copied to aws-cdk/assets. Since ALL
+    // DockerImageAsset content is uploaded to the same repo, it is impossible to distinguish
+    // one image from another if more than one image is used in the project. Thus, the
+    // ECRDeployment is used copy the DockerImageAsset to the Repository
     const dockerImageAsset = new DockerImageAsset(this, "DemoAppContainerAsset", {
       directory: path.resolve(__dirname, "../springboot-app")
     });
 
+    // Here, we copy the DockerImageAsset to the destination repository and use the revision value
+    // as the image tag
     new ecrdeploy.ECRDeployment(this, "DeployDockerImageVersionedTag", {
       src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
       dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:${props.revision}`)
     });
-    // The latest tag is only used for the cinc-auditor tests.
+
+    // The latest tag is only used for the cinc-auditor tests as there's not a great way to
+    // reference a specific tag in CINC Auditor. The task definition will AWLWAYS use a tagged
+    // image reference
     new ecrdeploy.ECRDeployment(this, "DeployDockerImageLatestTag", {
       src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
       dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:latest`)
