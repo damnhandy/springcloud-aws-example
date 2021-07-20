@@ -9,10 +9,10 @@ server:
   undertow:
     accesslog:
       enabled: true
-      rotate: false
-      directory: /dev
-      prefix: stdout
-      suffix: ""
+      dir: "/dev"
+      file-date-format:
+      prefix: "stdout"
+      suffix:
 spring:
   application:
     name: demoapp
@@ -50,6 +50,7 @@ spring:
         elideSetAutoCommits: true
         maintainTimeStats: false
 management:
+  m
   server:
     port: 8081
   endpoint:

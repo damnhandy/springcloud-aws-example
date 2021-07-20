@@ -4,7 +4,7 @@ import { InstanceClass, InstanceSize, InstanceType, IVpc } from "@aws-cdk/aws-ec
 import * as rds from "@aws-cdk/aws-rds";
 import { IDatabaseCluster } from "@aws-cdk/aws-rds";
 import * as ssm from "@aws-cdk/aws-ssm";
-import { IStringParameter, StringParameter } from "@aws-cdk/aws-ssm";
+import { IStringParameter } from "@aws-cdk/aws-ssm";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
 import { IKey } from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";

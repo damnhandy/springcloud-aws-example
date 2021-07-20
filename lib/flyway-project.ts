@@ -13,13 +13,10 @@ import * as path from "path";
 import { IKey } from "@aws-cdk/aws-kms";
 import * as s3 from "@aws-cdk/aws-s3";
 import { EventType } from "@aws-cdk/aws-s3";
-import * as s3deploy from "@aws-cdk/aws-s3-deployment";
 import { ISecret } from "@aws-cdk/aws-secretsmanager";
 import * as ssm from "@aws-cdk/aws-ssm";
 import { IStringParameter } from "@aws-cdk/aws-ssm";
-import * as ecrdeploy from "cdk-ecr-deployment";
 import { IRepository } from "@aws-cdk/aws-ecr";
-import * as ecr_assets from "@aws-cdk/aws-ecr-assets";
 import * as logs from "@aws-cdk/aws-logs";
 import { RetentionDays } from "@aws-cdk/aws-logs";
 import * as lambda from "@aws-cdk/aws-lambda";
@@ -44,6 +41,10 @@ export interface FlywayProjectProps extends cdk.StackProps {
   readonly revision: string;
 }
 
+/**
+ * Construct that will set up a CodeBuild Project that will run the Flyway CLI to perform database
+ * migrations. This
+ */
 export class FlywayProject extends Construct {
   vpc: IVpc;
   kmsKey: IKey;
@@ -126,12 +127,15 @@ export class FlywayProject extends Construct {
     // include a double slash, making the policy invalid. Thus, we need to re-add them
     props.dbJdbcUrl.grantRead(this.flywayProject);
 
+    // Permit the CodeBuild Project access to the MySQL databse
     this.flywayProject.connections.allowTo(
       props.mysqlSecurityGroup,
       Port.tcp(3306),
-      "Application access to RDS"
+      "CodeBuild access to RDS"
     );
 
+    // Creates the lambda function that will start the code build job whenever a new ZIP file is
+    // put into the S3 bucket
     const codebuildTrigger = new NodejsFunction(this, "EventTrigger", {
       memorySize: 1024,
       timeout: cdk.Duration.seconds(5),
@@ -149,6 +153,7 @@ export class FlywayProject extends Construct {
       }
     });
     props.sourceBucket.grantRead(codebuildTrigger);
+    // Allows the lambda to start the codebuild project
     codebuildTrigger.addToRolePolicy(
       new PolicyStatement({
         effect: Effect.ALLOW,
@@ -156,6 +161,7 @@ export class FlywayProject extends Construct {
         resources: [this.flywayProject.projectArn]
       })
     );
+    /// Adds the event sources that will trigger the lambda
     props.sourceBucket.addEventNotification(
       EventType.OBJECT_CREATED_PUT,
       new LambdaDestination(codebuildTrigger)

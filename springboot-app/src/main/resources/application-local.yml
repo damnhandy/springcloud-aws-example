@@ -1,3 +1,11 @@
+server:
+  undertow:
+    accesslog:
+      enabled: true
+      dir: "/tmp"
+      file-date-format:
+      prefix: stdout
+      suffix:
 spring:
   config:
     import: "configtree:./credentials/"
@@ -12,7 +20,7 @@ spring:
         sslMode: VERIFY_CA
         trustCertificateKeyStorePassword: "${jdbc_truststore_password}"
         trustCertificateKeyStoreType: PKCS12
-        trustCertificateKeyStoreUrl: "file:${PWD}/credentials/truststore.p12"
+        trustCertificateKeyStoreUrl: "file:${PWD}/credentials/jdbc_truststore_local.p12"
         fallbackToSystemTrustStore: false
         useLegacyDatetimeCode: false
         # Recommended MySQL connection settings from HikariCP
