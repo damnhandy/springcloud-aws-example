@@ -9,6 +9,7 @@
     "vscjava.vscode-java-pack",
     "esbenp.prettier-vscode",
     "dotdevru.prettier-java",
-    "dbaeumer.vscode-eslint"
+    "dbaeumer.vscode-eslint",
+    "bbenoist.nix"
   ]
 }
