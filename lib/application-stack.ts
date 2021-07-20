@@ -114,6 +114,7 @@ export class ApplicationStack extends cdk.Stack {
             "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
         }
       },
+      assignPublicIp: true,
       protocol: ApplicationProtocol.HTTP,
       protocolVersion: ApplicationProtocolVersion.HTTP1,
       memoryLimitMiB: 1024,
@@ -129,6 +130,11 @@ export class ApplicationStack extends cdk.Stack {
       protocol: Protocol.HTTP,
       healthyHttpCodes: "200"
     });
+    ecsService.loadBalancer.connections.allowTo(
+      ecsService.service,
+      Port.tcp(8081),
+      "ALB Health Check"
+    );
     appUserCredentials.grantRead(ecsService.taskDefinition.taskRole);
 
     this.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
