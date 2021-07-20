@@ -104,3 +104,15 @@ And finally deploy the stack:
 or if you don't want to deal with the prompts, run:
 
     npm run deploy
+
+## Verifying the AWS Deployment
+
+Once deployed, the AWS environment can be verified to ensure specific resources have been created
+and have been configured inline with expectations. The project uses
+[CINC Auditor](https://cinc.sh/start/auditor/)/[InSpec](https://inspec.io) to
+
+    cinc-auditor exec verification -t aws://
+
+or with InSpec:
+
+    inspec exec verification -t aws://

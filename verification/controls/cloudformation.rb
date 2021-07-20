@@ -14,7 +14,7 @@ control 'cloudformation-1.0' do
     end
   end
 
-  describe aws_cloudformation_stack('SpringBootDemoAppDBStack') do
+  describe aws_cloudformation_stack('SpringBootDemoAppStack') do
     it { should exist }
     its ('stack_status') do
       should be_in statuses

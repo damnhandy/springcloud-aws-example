@@ -1,6 +1,6 @@
 import * as cdk from "@aws-cdk/core";
 import { RemovalPolicy } from "@aws-cdk/core";
-import { IRepository } from "@aws-cdk/aws-ecr";
+import { IRepository, Repository } from "@aws-cdk/aws-ecr";
 import { DockerImageAsset } from "@aws-cdk/aws-ecr-assets";
 import {
   ApplicationProtocol,
@@ -81,9 +81,14 @@ export class ApplicationStack extends cdk.Stack {
       directory: path.resolve(__dirname, "../springboot-app")
     });
 
-    new ecrdeploy.ECRDeployment(this, "DeployDockerImage", {
+    new ecrdeploy.ECRDeployment(this, "DeployDockerImageVersionedTag", {
       src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
       dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:${props.revision}`)
+    });
+    // The latest tag is only used for the cinc-auditor tests.
+    new ecrdeploy.ECRDeployment(this, "DeployDockerImageLatestTag", {
+      src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
+      dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:latest`)
     });
 
     const logGroup = new logs.LogGroup(this, "LogGroup", {

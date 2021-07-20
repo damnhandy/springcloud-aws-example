@@ -17,7 +17,8 @@
     "lint": "eslint . --ext .ts",
     "lint-and-fix": "eslint . --ext .ts --fix",
     "prettier-format": "prettier --write .",
-    "prettier-watch": "onchange '**/*.*' -- prettier --write {{changed}}"
+    "prettier-watch": "onchange '**/*.*' -- prettier --write {{changed}}",
+    "verify" : "cinc-auditor exec verification -t aws://"
   },
   "devDependencies": {
     "@aws-cdk/assert": "^1.113.0",
