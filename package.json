@@ -9,7 +9,7 @@
     "watch": "tsc -w",
     "test": "jest",
     "cdk": "cdk",
-    "deploy" : "npx cdk deploy --all --require-approval never",
+    "deploy": "npx cdk deploy --all --require-approval never",
     "prepare": "husky install",
     "prebuild": "cd data-migration/ && zip -r ../data-migration.zip . && mv ../data-migration.zip ../data-migration-out && cd -",
     "postbuild": "cdk synth",

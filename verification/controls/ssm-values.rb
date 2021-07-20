@@ -33,8 +33,6 @@ control 'Parameter Store Values' do
     its('data_type') { should eq 'text' }
     its('value') { should_not eq nil }
   end
-
-
 end
 
 # At present, inspec-aws does not support Secrets Manager directly, thus, we use the Secrets Manager reference

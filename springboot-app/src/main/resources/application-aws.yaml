@@ -4,7 +4,7 @@ aws:
   secretsmanager:
     enabled: true
     default-context: "shared"
-    name: ${spring.application.name}
+    name: "${spring.application.name}"
 server:
   undertow:
     accesslog:
@@ -50,7 +50,6 @@ spring:
         elideSetAutoCommits: true
         maintainTimeStats: false
 management:
-  m
   server:
     port: 8081
   endpoint:
