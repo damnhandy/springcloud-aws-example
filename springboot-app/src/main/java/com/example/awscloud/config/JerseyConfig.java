@@ -22,16 +22,7 @@ public class JerseyConfig extends ResourceConfig {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JerseyConfig.class);
 
-  public JerseyConfig(Environment env) {
-    final MutablePropertySources sources = ((AbstractEnvironment) env).getPropertySources();
-    StreamSupport
-      .stream(sources.spliterator(), false)
-      .filter(ps -> ps instanceof EnumerablePropertySource)
-      .map(ps -> ((EnumerablePropertySource) ps).getPropertyNames())
-      .flatMap(Arrays::stream)
-      .distinct()
-      .forEach(prop -> LOGGER.info("{}: {}", prop, env.getProperty(prop)));
-    LOGGER.info("===========================================");
+  public JerseyConfig() {
     register(CarResource.class);
   }
 }
