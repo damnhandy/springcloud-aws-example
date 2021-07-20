@@ -114,23 +114,20 @@ export class ApplicationStack extends cdk.Stack {
             "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
         }
       },
-      assignPublicIp: true,
       protocol: ApplicationProtocol.HTTP,
       protocolVersion: ApplicationProtocolVersion.HTTP1,
       memoryLimitMiB: 1024,
       publicLoadBalancer: true,
-      listenerPort: 8080
+      listenerPort: 80
     });
     ecsService.taskDefinition.defaultContainer?.addPortMappings({
       containerPort: 8081
     });
-    // https://spring.io/blog/2020/03/25/liveness-and-readiness-probes-with-spring-boot
     ecsService.targetGroup.configureHealthCheck({
-      path: "/actuator/health/readiness",
+      path: "/actuator/health/liveness",
       port: "8081",
       protocol: Protocol.HTTP,
-      healthyHttpCodes: "200",
-      enabled: true
+      healthyHttpCodes: "200"
     });
     ecsService.loadBalancer.connections.allowTo(
       ecsService.service,
