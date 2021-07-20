@@ -1,6 +1,6 @@
 import * as cdk from "@aws-cdk/core";
 import { RemovalPolicy } from "@aws-cdk/core";
-import { IRepository, Repository } from "@aws-cdk/aws-ecr";
+import { IRepository } from "@aws-cdk/aws-ecr";
 import { DockerImageAsset } from "@aws-cdk/aws-ecr-assets";
 import {
   ApplicationProtocol,
