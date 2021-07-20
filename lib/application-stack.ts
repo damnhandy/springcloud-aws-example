@@ -115,7 +115,7 @@ export class ApplicationStack extends cdk.Stack {
         }
       },
       protocol: ApplicationProtocol.HTTP,
-      protocolVersion: ApplicationProtocolVersion.HTTP1,
+      protocolVersion: ApplicationProtocolVersion.HTTP2,
       memoryLimitMiB: 1024,
       publicLoadBalancer: true,
       listenerPort: 80

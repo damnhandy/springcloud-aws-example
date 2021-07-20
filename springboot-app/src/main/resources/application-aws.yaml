@@ -6,6 +6,8 @@ aws:
     default-context: "shared"
     name: "${spring.application.name}"
 server:
+  http2:
+    enabled: true
   undertow:
     accesslog:
       enabled: true
@@ -13,6 +15,7 @@ server:
       file-date-format:
       prefix: "access_log"
       suffix:
+  forward-headers-strategy: native
 spring:
   application:
     name: demoapp
