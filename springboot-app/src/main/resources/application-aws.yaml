@@ -10,9 +10,9 @@ server:
     accesslog:
       enabled: true
       dir: "/dev"
-      file-date-format:
+      file-date-format: ""
       prefix: "stdout"
-      suffix:
+      suffix: ""
 spring:
   application:
     name: demoapp
