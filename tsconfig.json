@@ -1,8 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
-    "module": "commonjs",
-    "lib": ["es2018"],
+    "target": "ES2019",
+    "module": "CommonJS",
+    "outDir": "dist",
+    "lib": ["es2019", "dom"],
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -19,5 +20,6 @@
     "strictPropertyInitialization": false,
     "typeRoots": ["./node_modules/@types"]
   },
-  "exclude": ["cdk.out"]
+  "include": ["bin/**/*.ts", "lib/**/*.ts", "test/**/*.ts", "src/**/*.ts", "lambdas/**/*.ts"],
+  "exclude": ["cdk.out", "clients"]
 }

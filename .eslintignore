@@ -17,3 +17,4 @@ lib/*.js
 bin/*.js
 *.d.ts
 buildspec.yml
+node_modules/*

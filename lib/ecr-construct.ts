@@ -1,10 +1,10 @@
-import * as cdk from "@aws-cdk/core";
-import { Construct, Duration, RemovalPolicy } from "@aws-cdk/core";
-import * as ecr from "@aws-cdk/aws-ecr";
-import { TagStatus } from "@aws-cdk/aws-ecr";
-import * as iam from "@aws-cdk/aws-iam";
-import { Effect } from "@aws-cdk/aws-iam";
-
+import * as cdk from "aws-cdk-lib";
+import * as ecr from "aws-cdk-lib/aws-ecr";
+import { TagStatus } from "aws-cdk-lib/aws-ecr";
+import * as iam from "aws-cdk-lib/aws-iam";
+import { Effect } from "aws-cdk-lib/aws-iam";
+import { Duration, RemovalPolicy } from "aws-cdk-lib/core";
+import { Construct } from "constructs";
 /**
  *
  */
@@ -34,7 +34,7 @@ export interface EcrRepoProps extends cdk.StackProps {
  * - deleting images that are n-days old
  * - removing any untagged images when that number reaches a specific threshold.
  */
-export class EcrRepoWithLifecyle extends Construct {
+export class EcrRepoWithLifecycle extends Construct {
   public repository: ecr.IRepository;
   props: EcrRepoProps;
   constructor(scope: Construct, id: string, props: EcrRepoProps) {

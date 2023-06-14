@@ -1,5 +1,6 @@
-import { Context, S3Event } from "aws-lambda";
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CodeBuildClient, StartBuildCommand } from "@aws-sdk/client-codebuild";
+import { S3Event } from "aws-lambda";
 
 /**
  * A simple Lambda function that listens for an S3 PUT event and triggers a codebuild
@@ -8,7 +9,7 @@ import { CodeBuildClient, StartBuildCommand } from "@aws-sdk/client-codebuild";
  * @param event the event from the S3 bucket
  * @param context the lambda context
  */
-export const handler = async (event: S3Event, context: Context): Promise<any> => {
+export const handler = async (event: S3Event): Promise<any> => {
   const key = event.Records[0].s3.object.key;
   if (key === process.env.TARGET_KEY) {
     const request = new StartBuildCommand({

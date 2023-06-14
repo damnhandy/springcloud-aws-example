@@ -4,18 +4,6 @@ export interface AppConfigOpts {
 }
 
 export class ParamNames {
-  static envPath(opts: AppConfigOpts): string {
-    return `/env/${opts.context}/${opts.name}`;
-  }
-
-  static appConfigPath(opts: AppConfigOpts): string {
-    return `/config/${opts.context}/${opts.name}`;
-  }
-
-  static appSecretPath(opts: AppConfigOpts): string {
-    return `/secret/${opts.context}/${opts.name}`;
-  }
-
   public static readonly APP_NAME = "demoapp";
 
   public static readonly SHARED_CONTEXT = "shared";
@@ -94,4 +82,16 @@ export class ParamNames {
     context: ParamNames.SHARED_CONTEXT,
     name: "jdbc/reader-hostname"
   });
+
+  static envPath(opts: AppConfigOpts): string {
+    return `/env/${opts.context}/${opts.name}`;
+  }
+
+  static appConfigPath(opts: AppConfigOpts): string {
+    return `/config/${opts.context}/${opts.name}`;
+  }
+
+  static appSecretPath(opts: AppConfigOpts): string {
+    return `/secret/${opts.context}/${opts.name}`;
+  }
 }

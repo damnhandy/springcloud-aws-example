@@ -1,14 +1,12 @@
-import * as cdk from "@aws-cdk/core";
-import { IConstruct } from "@aws-cdk/core";
-import * as ec2 from "@aws-cdk/aws-ec2";
-import { ISecurityGroup } from "@aws-cdk/aws-ec2";
-import { ParameterType, StringParameter } from "@aws-cdk/aws-ssm";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { ISecurityGroup } from "aws-cdk-lib/aws-ec2";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
 import { ParamNames } from "./names";
-
 /**
  *
  */
-export interface IBasicNetworking extends IConstruct {
+export interface IBasicNetworking extends Construct {
   readonly vpc: ec2.IVpc;
 
   readonly gatewayEndpoints: ec2.IGatewayVpcEndpoint[];
@@ -24,23 +22,20 @@ export interface IBasicNetworking extends IConstruct {
 /**
  *
  */
-export class BasicNetworking extends cdk.Construct implements IBasicNetworking {
+export class BasicNetworking extends Construct implements IBasicNetworking {
   public vpc: ec2.IVpc;
   public gatewayEndpoints: ec2.IGatewayVpcEndpoint[];
   public interfaceEndpoints: ec2.IInterfaceVpcEndpoint[];
 
-  constructor(scope: cdk.Construct, id: string) {
+  constructor(scope: Construct, id: string) {
     super(scope, id);
 
-    this.vpc = new ec2.Vpc(this, "Vpc", {
-      maxAzs: 2
-    });
+    this.vpc = new ec2.Vpc(this, "Vpc", {});
 
     new StringParameter(this, "VpcIdParam", {
       description: "DemoApp VPC",
       parameterName: ParamNames.VPC_ID,
-      stringValue: this.vpc.vpcId,
-      type: ParameterType.STRING
+      stringValue: this.vpc.vpcId
     });
 
     this.gatewayEndpoints = [];

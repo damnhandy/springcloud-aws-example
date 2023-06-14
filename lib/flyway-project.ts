@@ -1,30 +1,30 @@
-import * as cdk from "@aws-cdk/core";
-import { Construct, RemovalPolicy } from "@aws-cdk/core";
-import * as ec2 from "@aws-cdk/aws-ec2";
-import { ISecurityGroup, IVpc, Port } from "@aws-cdk/aws-ec2";
-import * as cb from "@aws-cdk/aws-codebuild";
+import * as path from "path";
+import * as cdk from "aws-cdk-lib";
+import * as cb from "aws-cdk-lib/aws-codebuild";
 import {
   BuildEnvironmentVariableType,
   ComputeType,
   IProject,
   Source
-} from "@aws-cdk/aws-codebuild";
-import * as path from "path";
-import { IKey } from "@aws-cdk/aws-kms";
-import * as s3 from "@aws-cdk/aws-s3";
-import { EventType } from "@aws-cdk/aws-s3";
-import { ISecret } from "@aws-cdk/aws-secretsmanager";
-import * as ssm from "@aws-cdk/aws-ssm";
-import { IStringParameter } from "@aws-cdk/aws-ssm";
-import { IRepository } from "@aws-cdk/aws-ecr";
-import * as logs from "@aws-cdk/aws-logs";
-import { RetentionDays } from "@aws-cdk/aws-logs";
-import * as lambda from "@aws-cdk/aws-lambda";
+} from "aws-cdk-lib/aws-codebuild";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { ISecurityGroup, IVpc, Peer, Port } from "aws-cdk-lib/aws-ec2";
+import { IRepository } from "aws-cdk-lib/aws-ecr";
+import { Effect, PolicyStatement } from "aws-cdk-lib/aws-iam";
+import { IKey } from "aws-cdk-lib/aws-kms";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
+import * as logs from "aws-cdk-lib/aws-logs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { EventType } from "aws-cdk-lib/aws-s3";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import { LambdaDestination } from "aws-cdk-lib/aws-s3-notifications";
+import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { IStringParameter } from "aws-cdk-lib/aws-ssm";
+import { RemovalPolicy } from "aws-cdk-lib/core";
+import { Construct } from "constructs";
 import { ParamNames } from "./names";
-import { NodejsFunction } from "@aws-cdk/aws-lambda-nodejs";
-import { Effect, PolicyStatement } from "@aws-cdk/aws-iam";
-import { LambdaDestination } from "@aws-cdk/aws-s3-notifications";
-
 export interface FlywayProjectProps extends cdk.StackProps {
   readonly vpc: IVpc;
   readonly kmsKey: IKey;
@@ -57,11 +57,12 @@ export class FlywayProject extends Construct {
     this.kmsKey = props.kmsKey;
 
     this.securityGroup = new ec2.SecurityGroup(this, "ProjectSecurityGroup", {
-      allowAllOutbound: true,
+      allowAllOutbound: false,
       description: "Security Group for the Flyway CodeBuild project",
       securityGroupName: "FlywayCodeBuildProjectSG",
       vpc: this.vpc
     });
+    this.securityGroup.addEgressRule(Peer.anyIpv4(), Port.tcp(443));
 
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       encryptionKey: this.kmsKey,
@@ -79,7 +80,7 @@ export class FlywayProject extends Construct {
         }
       },
       encryptionKey: this.kmsKey,
-      description: "Codebuild Project to apply DB changes to the Aurora MySQL instance",
+      description: "Codebuild Project to apply DB changes to the Aurora  instance",
       securityGroups: [this.securityGroup],
       source: Source.s3({
         bucket: props.sourceBucket,
@@ -89,7 +90,7 @@ export class FlywayProject extends Construct {
         subnets: this.vpc.privateSubnets
       }),
       environment: {
-        buildImage: cb.LinuxBuildImage.STANDARD_5_0,
+        buildImage: cb.LinuxBuildImage.STANDARD_7_0,
         computeType: ComputeType.SMALL,
         privileged: false,
         // These values could have been just as easily added to the buildspec.yml directly
@@ -139,7 +140,7 @@ export class FlywayProject extends Construct {
     const codebuildTrigger = new NodejsFunction(this, "EventTrigger", {
       memorySize: 1024,
       timeout: cdk.Duration.seconds(5),
-      runtime: lambda.Runtime.NODEJS_14_X,
+      runtime: lambda.Runtime.NODEJS_18_X,
       handler: "handler",
       entry: path.join(__dirname, "../lambdas/codebuild-trigger/s3-trigger.ts"),
       environment: {
@@ -149,7 +150,7 @@ export class FlywayProject extends Construct {
       },
       bundling: {
         minify: false,
-        externalModules: ["aws-sdk"]
+        externalModules: ["@aws-sdk/client-codebuild"]
       }
     });
     props.sourceBucket.grantRead(codebuildTrigger);

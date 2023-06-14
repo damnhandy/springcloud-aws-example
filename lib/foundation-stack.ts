@@ -1,15 +1,15 @@
-import * as cdk from "@aws-cdk/core";
-import { RemovalPolicy } from "@aws-cdk/core";
-import * as kms from "@aws-cdk/aws-kms";
-import * as s3 from "@aws-cdk/aws-s3";
-import { IRepository } from "@aws-cdk/aws-ecr";
-import * as iam from "@aws-cdk/aws-iam";
-import { ParameterType, StringParameter } from "@aws-cdk/aws-ssm";
-import { EcrRepoWithLifecyle } from "./ecr-construct";
-import { BasicNetworking, IBasicNetworking } from "./network-construct";
-import { ParamNames } from "./names";
+import * as cdk from "aws-cdk-lib";
+import { RemovalPolicy } from "aws-cdk-lib";
+import { IRepository } from "aws-cdk-lib/aws-ecr";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as kms from "aws-cdk-lib/aws-kms";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
 import { DatabaseConstruct } from "./database-construct";
-
+import { EcrRepoWithLifecycle } from "./ecr-construct";
+import { ParamNames } from "./names";
+import { BasicNetworking, IBasicNetworking } from "./network-construct";
 export interface FoundationStackProps extends cdk.StackProps {
   /**
    * The name of the service and its assocated database.
@@ -36,7 +36,7 @@ export class FoundationStack extends cdk.Stack {
   public appRepo: IRepository;
   public flywayRepo: IRepository;
 
-  constructor(scope: cdk.Construct, id: string, props: FoundationStackProps) {
+  constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
 
     this.networking = new BasicNetworking(this, "VPC");
@@ -53,15 +53,13 @@ export class FoundationStack extends cdk.Stack {
     new StringParameter(this, "KmsKeyArnParam", {
       description: "DemoApp KMS Key ARN",
       parameterName: ParamNames.KMS_ARN,
-      stringValue: this.kmsKey.keyArn,
-      type: ParameterType.STRING
+      stringValue: this.kmsKey.keyArn
     });
 
     new StringParameter(this, "KmsKeyIdParam", {
       description: "DemoApp KMS Key ID",
       parameterName: ParamNames.KMS_ID,
-      stringValue: this.kmsKey.keyId,
-      type: ParameterType.STRING
+      stringValue: this.kmsKey.keyId
     });
 
     this.artifactsBucket = new s3.Bucket(this, "ArtifactsBucket", {
@@ -95,18 +93,16 @@ export class FoundationStack extends cdk.Stack {
     new StringParameter(this, "ArtifactsBucketArnParam", {
       description: "Artifacts Bucket ARN",
       parameterName: ParamNames.ARTIFACTS_BUCKET_ARN,
-      stringValue: this.artifactsBucket.bucketArn,
-      type: ParameterType.STRING
+      stringValue: this.artifactsBucket.bucketArn
     });
 
     new StringParameter(this, "ArtifactsBucketNameParam", {
       description: "Artifacts Bucket Name",
       parameterName: ParamNames.ARTIFACTS_BUCKET_NAME,
-      stringValue: this.artifactsBucket.bucketName,
-      type: ParameterType.STRING
+      stringValue: this.artifactsBucket.bucketName
     });
 
-    const appRepo = new EcrRepoWithLifecyle(this, "DemoAppImageRepo", {
+    const appRepo = new EcrRepoWithLifecycle(this, "DemoAppImageRepo", {
       repositoryName: "apps/demoapp",
       withCodeBuildPolicy: false
     });

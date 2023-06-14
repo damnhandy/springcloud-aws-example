@@ -16,5 +16,6 @@
         "**/*.js": {
             "when": "$(basename).ts"
         },
-    }
+    },
+    "java.compile.nullAnalysis.mode": "automatic"
 }

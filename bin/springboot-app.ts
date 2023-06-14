@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import "source-map-support/register";
-import * as cdk from "@aws-cdk/core";
 import * as cp from "child_process";
-import { FoundationStack } from "../lib/foundation-stack";
+import * as cdk from "aws-cdk-lib";
 import { ApplicationStack } from "../lib/application-stack";
+import { FoundationStack } from "../lib/foundation-stack";
 
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";

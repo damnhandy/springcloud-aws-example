@@ -1,18 +1,18 @@
-import * as cdk from "@aws-cdk/core";
-import * as ec2 from "@aws-cdk/aws-ec2";
-import { InstanceClass, InstanceSize, InstanceType, IVpc } from "@aws-cdk/aws-ec2";
-import * as rds from "@aws-cdk/aws-rds";
-import { IDatabaseCluster } from "@aws-cdk/aws-rds";
-import * as ssm from "@aws-cdk/aws-ssm";
-import { IStringParameter } from "@aws-cdk/aws-ssm";
-import { ISecret } from "@aws-cdk/aws-secretsmanager";
-import { IKey } from "@aws-cdk/aws-kms";
-import * as s3 from "@aws-cdk/aws-s3";
-import { IRepository } from "@aws-cdk/aws-ecr";
+import * as cdk from "aws-cdk-lib";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import { InstanceClass, InstanceSize, InstanceType, IVpc } from "aws-cdk-lib/aws-ec2";
+import { IRepository } from "aws-cdk-lib/aws-ecr";
+import { IKey } from "aws-cdk-lib/aws-kms";
+import * as rds from "aws-cdk-lib/aws-rds";
+import { IDatabaseCluster } from "aws-cdk-lib/aws-rds";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+import { IStringParameter } from "aws-cdk-lib/aws-ssm";
+import { Construct } from "constructs";
 import { FlywayProject } from "./flyway-project";
 import { ParamNames } from "./names";
 import { ReferenceUtils } from "./utils";
-
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly vpc: IVpc;
   readonly kmsKey: IKey;
@@ -24,8 +24,8 @@ export interface DatabaseStackProps extends cdk.StackProps {
   readonly sourceZipPath: string;
 }
 
-export class DatabaseConstruct extends cdk.Construct {
-  public mysql_cluster: IDatabaseCluster;
+export class DatabaseConstruct extends Construct {
+  public dbCluster: IDatabaseCluster;
   public dbUrl: IStringParameter;
   public dbAdminUsername: IStringParameter;
   public dbAdminCreds: ISecret;
@@ -35,10 +35,9 @@ export class DatabaseConstruct extends cdk.Construct {
   referenceUtils: ReferenceUtils;
   flywayRepo: IRepository;
 
-  constructor(scope: cdk.Construct, id: string, props: DatabaseStackProps) {
+  constructor(scope: Construct, id: string, props: DatabaseStackProps) {
     super(scope, id);
     this.artifactsBucket = props.artifactsBucket;
-    this.referenceUtils = new ReferenceUtils(this, "RefUtil");
     const dbUsername = "admin";
 
     this.kmsKey = props.kmsKey;
@@ -55,49 +54,51 @@ export class DatabaseConstruct extends cdk.Construct {
       encryptionKey: this.kmsKey
     });
 
-    const parameter_group = new rds.ParameterGroup(this, "DBParameterGroup", {
-      engine: rds.DatabaseClusterEngine.auroraMysql({
-        version: rds.AuroraMysqlEngineVersion.VER_2_07_2
+    const parameterGroup = new rds.ParameterGroup(this, "DBParameterGroup", {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_15_2
       }),
       parameters: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         require_secure_transport: "ON",
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         tls_version: "TLSv1.2"
       }
     });
 
-    this.mysql_cluster = new rds.DatabaseCluster(this, "DBCluster", {
+    this.dbCluster = new rds.DatabaseCluster(this, "DBCluster", {
       defaultDatabaseName: props.serviceName,
-      parameterGroup: parameter_group,
+      parameterGroup: parameterGroup,
       storageEncryptionKey: this.kmsKey,
       credentials: rds.Credentials.fromSecret(this.dbAdminCreds),
-      engine: rds.DatabaseClusterEngine.AURORA_MYSQL,
+      engine: rds.DatabaseClusterEngine.AURORA_POSTGRESQL,
       s3ImportBuckets: [this.artifactsBucket],
       instanceProps: {
         instanceType: InstanceType.of(InstanceClass.T3, InstanceSize.SMALL),
         vpc: props.vpc,
         publiclyAccessible: false,
         vpcSubnets: {
-          subnetType: ec2.SubnetType.PRIVATE
+          subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS
         }
       },
       deletionProtection: false
     });
 
-    this.appUserCreds.attach(this.mysql_cluster);
+    this.appUserCreds.attach(this.dbCluster);
 
     new ssm.StringParameter(this, "SecurityGroupId", {
       parameterName: ParamNames.MYSQL_SG_ID,
-      stringValue: this.mysql_cluster.connections.securityGroups[0].securityGroupId
+      stringValue: this.dbCluster.connections.securityGroups[0].securityGroupId
     });
 
     new ssm.StringParameter(this, "HostNameSSMParam", {
       parameterName: ParamNames.JDBC_HOSTNAME,
-      stringValue: this.mysql_cluster.clusterEndpoint.hostname
+      stringValue: this.dbCluster.clusterEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "ReaderHostNameSSMParam", {
       parameterName: ParamNames.JDBC_READER_HOSTNAME,
-      stringValue: this.mysql_cluster.clusterReadEndpoint.hostname
+      stringValue: this.dbCluster.clusterReadEndpoint.hostname
     });
 
     // hard coding the value for now. this.mysql_cluster.clusterEndpoint.port returns a number,
@@ -114,11 +115,11 @@ export class DatabaseConstruct extends cdk.Construct {
 
     this.dbUrl = new ssm.StringParameter(this, "JdbcUrlSSMParam", {
       parameterName: ParamNames.JDBC_URL,
-      stringValue: buildJdbcUrl(this.mysql_cluster)
+      stringValue: buildJdbcUrl(this.dbCluster)
     });
 
-    function buildJdbcUrl(mysql_cluster: rds.IDatabaseCluster): string {
-      return `jdbc:mysql://${mysql_cluster.clusterEndpoint.hostname}:3306/${props.serviceName}`;
+    function buildJdbcUrl(dbCluster: rds.IDatabaseCluster): string {
+      return `jdbc:mysql://${dbCluster.clusterEndpoint.hostname}:3306/${props.serviceName}`;
     }
 
     new FlywayProject(this, "Flyway", {
@@ -134,7 +135,7 @@ export class DatabaseConstruct extends cdk.Construct {
       prefix: "app",
       sourceBucket: this.artifactsBucket,
       flywayImageRepo: this.flywayRepo,
-      mysqlSecurityGroup: this.mysql_cluster.connections.securityGroups[0],
+      mysqlSecurityGroup: this.dbCluster.connections.securityGroups[0],
       revision: props.revision
     });
   }

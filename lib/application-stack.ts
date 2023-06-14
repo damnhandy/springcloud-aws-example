@@ -1,27 +1,26 @@
-import * as cdk from "@aws-cdk/core";
-import { RemovalPolicy } from "@aws-cdk/core";
-import { IRepository } from "@aws-cdk/aws-ecr";
-import { DockerImageAsset } from "@aws-cdk/aws-ecr-assets";
+import * as path from "path";
+import * as cdk from "aws-cdk-lib";
+import { RemovalPolicy } from "aws-cdk-lib";
+import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
+import { IRepository } from "aws-cdk-lib/aws-ecr";
+import * as ecs from "aws-cdk-lib/aws-ecs";
+import { LogDriver } from "aws-cdk-lib/aws-ecs";
+import { ApplicationLoadBalancedFargateService } from "aws-cdk-lib/aws-ecs-patterns";
 import {
   ApplicationProtocol,
   ApplicationProtocolVersion,
   Protocol
-} from "@aws-cdk/aws-elasticloadbalancingv2";
-import * as ecs from "@aws-cdk/aws-ecs";
-import { LogDriver } from "@aws-cdk/aws-ecs";
-import { ApplicationLoadBalancedFargateService } from "@aws-cdk/aws-ecs-patterns";
-import * as path from "path";
-import * as ecrdeploy from "cdk-ecr-deployment";
-import * as logs from "@aws-cdk/aws-logs";
-import { RetentionDays } from "@aws-cdk/aws-logs";
-import { Secret } from "@aws-cdk/aws-secretsmanager";
-import { IVpc, Port } from "@aws-cdk/aws-ec2";
-import { StringParameter } from "@aws-cdk/aws-ssm";
-import { IKey } from "@aws-cdk/aws-kms";
-import { ReferenceUtils } from "./utils";
+} from "aws-cdk-lib/aws-elasticloadbalancingv2";
+import { IKey, Key } from "aws-cdk-lib/aws-kms";
+import * as logs from "aws-cdk-lib/aws-logs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import { Secret } from "aws-cdk-lib/aws-secretsmanager";
+import { StringParameter } from "aws-cdk-lib/aws-ssm";
+
+import { Construct } from "constructs";
 import { ParamNames } from "./names";
-import * as s3deploy from "@aws-cdk/aws-s3-deployment";
-import * as s3 from "@aws-cdk/aws-s3";
 
 /**
  *
@@ -43,19 +42,15 @@ export class ApplicationStack extends cdk.Stack {
   appRepo: IRepository;
   vpc: IVpc;
   kmsKey: IKey;
-  referenceUtils: ReferenceUtils;
 
-  constructor(scope: cdk.Construct, id: string, props: ApplicationStackProps) {
+  constructor(scope: Construct, id: string, props: ApplicationStackProps) {
     super(scope, id, props);
 
-    this.referenceUtils = new ReferenceUtils(this, "AppStackRefUtils");
-    this.appRepo = this.referenceUtils.findEcrRepoByParam(
-      StringParameter.fromStringParameterName(this, "EcrRef,", ParamNames.APP_ECR_REPO_NAME)
-    );
-
     this.vpc = props.vpc;
-    this.kmsKey = this.referenceUtils.findKmsKeyByParam(
-      StringParameter.fromStringParameterName(this, "KmsRef2", ParamNames.KMS_ARN)
+    this.kmsKey = Key.fromKeyArn(
+      this,
+      "KmsKey",
+      StringParameter.fromStringParameterName(this, "KmsRef", ParamNames.KMS_ARN).stringValue
     );
 
     const sqlDataDeployment = new s3deploy.BucketDeployment(this, "CopySQLData", {
@@ -77,29 +72,6 @@ export class ApplicationStack extends cdk.Stack {
     // Ensure that the S3 deployment happens BEFORE the creation of the ECS resources
     cluster.node.addDependency(sqlDataDeployment);
 
-    // Creates the DockerImageAsset, which will then be copied to aws-cdk/assets. Since ALL
-    // DockerImageAsset content is uploaded to the same repo, it is impossible to distinguish
-    // one image from another if more than one image is used in the project. Thus, the
-    // ECRDeployment is used copy the DockerImageAsset to the Repository
-    const dockerImageAsset = new DockerImageAsset(this, "DemoAppContainerAsset", {
-      directory: path.resolve(__dirname, "../springboot-app")
-    });
-
-    // Here, we copy the DockerImageAsset to the destination repository and use the revision value
-    // as the image tag
-    new ecrdeploy.ECRDeployment(this, "DeployDockerImageVersionedTag", {
-      src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
-      dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:${props.revision}`)
-    });
-
-    // The latest tag is only used for the cinc-auditor tests as there's not a great way to
-    // reference a specific tag in CINC Auditor. The task definition will AWLWAYS use a tagged
-    // image reference
-    new ecrdeploy.ECRDeployment(this, "DeployDockerImageLatestTag", {
-      src: new ecrdeploy.DockerImageName(dockerImageAsset.imageUri),
-      dest: new ecrdeploy.DockerImageName(`${this.appRepo.repositoryUri}:latest`)
-    });
-
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       encryptionKey: this.kmsKey,
       retention: RetentionDays.ONE_WEEK,
@@ -120,7 +92,7 @@ export class ApplicationStack extends cdk.Stack {
           logGroup,
           streamPrefix: `${props.serviceName}`
         }),
-        image: ecs.ContainerImage.fromEcrRepository(this.appRepo, props.revision),
+        image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app")),
         containerPort: 8080,
         environment: {
           SPRING_PROFILES_ACTIVE: "aws",
@@ -151,12 +123,5 @@ export class ApplicationStack extends cdk.Stack {
     appUserCredentials.grantRead(ecsService.taskDefinition.taskRole);
 
     this.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
-
-    this.referenceUtils.addToSecurityGroup({
-      source: ecsService.service,
-      parameterName: ParamNames.MYSQL_SG_ID,
-      port: Port.tcp(3306),
-      description: "Application access to RDS"
-    });
   }
 }
