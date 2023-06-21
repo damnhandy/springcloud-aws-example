@@ -2,7 +2,7 @@ package com.example.awscloud.model;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Year;
-import javax.persistence.*;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "cars")

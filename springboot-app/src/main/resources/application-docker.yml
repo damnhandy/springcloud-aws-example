@@ -11,32 +11,25 @@ spring:
     name: demoapp
   config:
     import: "configtree:/run/secrets/"
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          lob:
+            non_contextual_creation: true
   datasource:
-    url: "jdbc:mysql://mysql:3306/demoapp"
+    url: "jdbc:postgresql://postgres:5432/postgres"
     username: "appuser"
     password: "${appuser_password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
-        serverTimezone: UTC
-        sslMode: VERIFY_CA
-        trustCertificateKeyStorePassword: "${jdbc_truststore_password}"
-        trustCertificateKeyStoreType: "PKCS12"
-        trustCertificateKeyStoreUrl: "file:${jdbc.truststore.path}"
-        fallbackToSystemTrustStore: false
-        useLegacyDatetimeCode: false
-        # Recommended MySQL connection settings from HikariCP
-        # https://github.com/brettwooldridge/HikariCP/wiki/MySQL-Configuration
-        cachePrepStmts: true
-        prepStmtCacheSize: 250
-        prepStmtCacheSqlLimit: 2048
-        useServerPrepStmts: true
-        useLocalSessionState: true
-        rewriteBatchedStatements: true
-        cacheResultSetMetadata: true
-        cacheServerConfiguration: true
-        elideSetAutoCommits: true
-        maintainTimeStats: false
+        ssl: true
+        sslmode: verify-ca
+        sslcert: /run/secrets/server.crt
+        sslrootcert: /run/secrets/ca.crt
+
 management:
   server:
     port: 8081

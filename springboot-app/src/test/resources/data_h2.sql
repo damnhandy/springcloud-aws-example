@@ -2,7 +2,7 @@ CREATE TABLE if not exists cars (
     id          INT NOT NULL,
     make        VARCHAR(100) NOT NULL,
     model       VARCHAR(100) NOT NULL,
-    model_year  YEAR(4) NOT NULL,
+    model_year  NUMERIC(4) NOT NULL,
     color       VARCHAR(40) NOT NULL,
     description TEXT NOT NULL,
     CONSTRAINT pk_id PRIMARY KEY  (id)

@@ -1,9 +1,9 @@
-
+CREATE DATABASE demoapp;
 CREATE TABLE if not exists cars (
                                     id          INT NOT NULL,
                                     make        VARCHAR(100) NOT NULL,
                                     model       VARCHAR(100) NOT NULL,
-                                    model_year  YEAR NOT NULL,
+                                    model_year  numeric NOT NULL,
                                     color       VARCHAR(40) NOT NULL,
                                     description TEXT NOT NULL,
                                     CONSTRAINT pk_id PRIMARY KEY  (id)

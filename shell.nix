@@ -3,6 +3,8 @@ mkShell {
   buildInputs = [
     nodejs-18_x
     temurin-bin-17
+    certstrap
+    openssl
     awscli2
     flyway
   ];

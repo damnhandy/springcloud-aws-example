@@ -2,9 +2,9 @@ package com.example.awscloud.resources;
 
 import com.example.awscloud.model.Car;
 import com.example.awscloud.repository.CarRepository;
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.springframework.stereotype.Service;
 
 @Service

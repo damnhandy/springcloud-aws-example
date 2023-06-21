@@ -8,30 +8,12 @@ server:
       suffix:
 spring:
   config:
-    import: "configtree:./credentials/"
+    import: "configtree:../credentials/"
   datasource:
-    url: "jdbc:mysql://localhost:3306/demoapp"
+    url: "jdbc:postgresql://localhost/demoapp"
     username: "appuser"
     password: "${appuser_password}"
     hikari:
       maximum-pool-size: 5
       data-source-properties:
-        serverTimezone: UTC
-        sslMode: VERIFY_CA
-        trustCertificateKeyStorePassword: "${jdbc_truststore_password}"
-        trustCertificateKeyStoreType: PKCS12
-        trustCertificateKeyStoreUrl: "file:${PWD}/credentials/jdbc_truststore_local.p12"
-        fallbackToSystemTrustStore: false
-        useLegacyDatetimeCode: false
-        # Recommended MySQL connection settings from HikariCP
-        # https://github.com/brettwooldridge/HikariCP/wiki/MySQL-Configuration
-        cachePrepStmts: true
-        prepStmtCacheSize: 250
-        prepStmtCacheSqlLimit: 2048
-        useServerPrepStmts: true
-        useLocalSessionState: true
-        rewriteBatchedStatements: true
-        cacheResultSetMetadata: true
-        cacheServerConfiguration: true
-        elideSetAutoCommits: true
-        maintainTimeStats: false
+        ssl: true

@@ -5,6 +5,10 @@ aws:
   secretsmanager:
     enabled: false
 spring:
+  sql:
+    init:
+      mode: embedded
+      data-locations: classpath:data_h2.sql
   jpa:
     database-platform: org.hibernate.dialect.H2Dialect
   datasource:
@@ -14,4 +18,3 @@ spring:
     password: password
     hikari:
       maximum-pool-size: 5
-    data: classpath:data_h2.sql

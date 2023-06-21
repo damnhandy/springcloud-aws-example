@@ -1,80 +1,81 @@
 # Docker Compose file Reference (https://docs.docker.com/compose/compose-file/)
 
-version: "3.8"
+version: "3.9"
 
 services:
   springboot-app:
     build:
       context: springboot-app
       dockerfile: Dockerfile
-    mem_limit: 512m
     mem_reservation: 512M
     secrets:
       - appuser_password
       - jdbc_truststore_password
       - jdbc_truststore_path
+      - source: root_ca
+        target: ca.crt
+        mode: 0600
+      - source: server_cert
+        target: server.crt
+        mode: 0600
     ports:
       - "8080:8080"
       - "8081:8081"
     networks:
       - demo
+    links:
+      - postgres
     restart: always
     depends_on:
-      - mysql
+      - postgres
     environment:
       JDBC_TRUSTSTORE_PATH: /run/secrets/jdbc_truststore_path
       AWS_REGION: us-east-1
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
 
-  mysql:
-    image: mysql:8.0.25
-    user: mysql
+  postgres:
+    image: postgres:15
+    user: postgres
     command:
-      - "mysqld"
-      - "--character-set-server=utf8mb4"
-      - "--collation-server=utf8mb4_unicode_ci"
-      - "--bind-address=0.0.0.0"
-      - "--ssl-ca=/run/secrets/ca.pem"
-      - "--ssl-cert=/run/secrets/server-cert.pem"
-      - "--ssl-key=/run/secrets/server-key.pem"
-      - "--default_authentication_plugin=mysql_native_password"
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/run/secrets/server.crt"
+      - "-c"
+      - "ssl_key_file=/run/secrets/server.key"
+      - "-c"
+      - "ssl_ca_file=/run/secrets/ca.crt"
     networks:
       - demo
+
     ports:
-      - "3306:3306"
+      - "5432:5432"
     restart: always
     environment:
-      MYSQL_DATABASE: demoapp
-      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/root_password
-      MYSQL_ROOT_HOST: 192.0.0.0/255.0.0.0
-      MYSQL_USER: appuser
-      MYSQL_PASSWORD_FILE: /run/secrets/appuser_password
-      MYSQL_USER_HOST: 192.0.0.0/255.0.0.0
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/root_password
+      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
+      - ./database:/var/lib/postgresql/data
       - ./data-migration/sql/V2__initial_tables.sql:/docker-entrypoint-initdb.d/V2__initial_tables.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     secrets:
       - source: root_password
       - source: appuser_password
-      - source: mysql_root_ca
-        target: ca.pem
-        uid: "999"
-        gid: "999"
-        mode: 0440
+      - source: root_ca
+        target: ca.crt
+        mode: 0600
       - source: server_key
-        target: server-key.pem
-        uid: "999"
-        gid: "999"
-        mode: 0440
+        target: server.key
+        mode: 0600
       - source: server_cert
-        target: server-cert.pem
-        uid: "999"
-        gid: "999"
-        mode: 0440
+        target: server.crt
+        mode: 0600
 
 secrets:
   root_password:
@@ -85,11 +86,13 @@ secrets:
     file: ./credentials/jdbc_truststore_password
   jdbc_truststore_path:
     file: ./credentials/jdbc_truststore_local.p12
-  mysql_root_ca:
-    file: ./credentials/ca.pem
+  root_ca:
+    file: ./credentials/ca.crt
+  server_key_der:
+    file: ./credentials/server.key.der
   server_key:
-    file: ./credentials/server-key.pem
+    file: ./credentials/server.key
   server_cert:
-    file: ./credentials/server-cert.pem
+    file: ./credentials/server.crt
 networks:
   demo:

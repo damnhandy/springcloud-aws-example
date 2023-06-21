@@ -2,13 +2,13 @@ package com.example.awscloud.repository;
 
 import com.example.awscloud.model.Car;
 import java.util.List;
-import javax.persistence.EntityManager;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class CarRepository {
 
-  EntityManager entityManager;
+  private EntityManager entityManager;
 
   /**
    *

@@ -22,35 +22,14 @@ spring:
     import:
       - "aws-secretsmanager:/secret/${spring.application.name}/appuser"
   datasource:
-    url: "jdbc:mysql://${host}:${port}/demoapp"
+    url: "jdbc:postgress://${host}:${port}/demoapp"
     username: "appuser"
     password: "${password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
-        serverTimezone: UTC
-        sslMode: VERIFY_IDENTITY
-        trustCertificateKeyStorePassword: "changeit"
-        trustCertificateKeyStoreType: "PKCS12"
-        trustCertificateKeyStoreUrl: "file:/opt/app/jdbc_truststore_aws.p12"
-        # MySQL Connector/J doesn't enable TLSv1.2 by default and it MUST be explicitly enabled when the server
-        # is configured to use it. In this case, the RDS database is setup to require that clients use TLSv1.2
-        # https://dev.mysql.com/doc/connector-j/8.0/en/connector-j-usagenotes-known-issues-limitations.html
-        enabledTLSProtocols: "TLSv1.2"
-        fallbackToSystemTrustStore: true
-        useLegacyDatetimeCode: false
-        # Recommended MySQL connection settings from HikariCP
-        # https://github.com/brettwooldridge/HikariCP/wiki/MySQL-Configuration
-        cachePrepStmts: true
-        prepStmtCacheSize: 250
-        prepStmtCacheSqlLimit: 2048
-        useServerPrepStmts: true
-        useLocalSessionState: true
-        rewriteBatchedStatements: true
-        cacheResultSetMetadata: true
-        cacheServerConfiguration: true
-        elideSetAutoCommits: true
-        maintainTimeStats: false
+        ssl: true
+
 management:
   server:
     port: 8081
