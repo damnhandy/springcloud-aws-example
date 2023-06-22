@@ -28,7 +28,9 @@ spring:
     hikari:
       maximum-pool-size: 20
       data-source-properties:
+        currentSchema: demoapp
         ssl: true
+        sslmode: verify-ca
 
 management:
   server:

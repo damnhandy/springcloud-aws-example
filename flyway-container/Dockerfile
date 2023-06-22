@@ -1,8 +1,8 @@
-FROM registry.access.redhat.com/ubi8/ubi:8.4 as builder
+FROM registry.access.redhat.com/ubi8/ubi:8.8 as builder
 # We don't use the RedHat JDK distribution as it's not structured as a
 # modular JDK like OpenJDK or OracleJDK
 ENV TMP_ROOT=/chroot/app
-ENV FLYWAY_VERSION 7.11.1
+ENV FLYWAY_VERSION 9.20.0
 
 # Install the DNF plugins so we can run dnf download
 RUN dnf install -y dnf-plugins-core
@@ -23,15 +23,18 @@ RUN rpm --root ${TMP_ROOT} -ivh --nodeps redhat-release*rpm
 # where it seems to use the configuration on the host OS.
 RUN mkdir -p "${TMP_ROOT}/etc/yum.repos.d/"
 RUN cp -r "/etc/yum.repos.d/ubi.repo" "${TMP_ROOT}/etc/yum.repos.d/ubi.repo"
-RUN dnf --installroot=${TMP_ROOT} -y install coreutils glibc-locale-source glibc-langpack-en \
+RUN dnf --installroot=${TMP_ROOT} -y install coreutils glibc-locale-source glibc-langpack-en findutils \
   --releasever 8 \
   --setopt=install_weak_deps=False \
   --setopt=tsflags=nodocs \
   --setopt=override_install_langs=en_US.utf8
 
-RUN curl -LO https://github.com/AdoptOpenJDK/openjdk11-binaries/releases/download/jdk-11.0.11%2B9/OpenJDK11U-jdk_x64_linux_hotspot_11.0.11_9.tar.gz
-RUN tar xzf OpenJDK11U-jdk_x64_linux_hotspot_11.0.11_9.tar.gz
-RUN mv jdk-11.0.11+9 ${TMP_ROOT}/usr/local
+ENV JVM_VERSION=jdk-17.0.7+7
+RUN curl -LO https://github.com/adoptium/temurin17-binaries/releases/download/${JVM_VERSION}/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
+RUN tar xzf OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
+RUN mv ${JVM_VERSION} ${TMP_ROOT}/usr/local
+ENV JAVA_HOME /usr/local/${JVM_VERSION}
+ENV PATH ${JAVA_HOME}/bin:${PATH}
 
 #RUN curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}.tar.gz.sha1 -o flyway-commandline-${FLYWAY_VERSION}.tar.gz.sha1
 RUN curl -L https://repo1.maven.org/maven2/org/flywaydb/flyway-commandline/${FLYWAY_VERSION}/flyway-commandline-${FLYWAY_VERSION}.tar.gz -o flyway-commandline-${FLYWAY_VERSION}.tar.gz
@@ -42,8 +45,8 @@ RUN tar -xzf flyway-commandline-${FLYWAY_VERSION}.tar.gz --strip-components=1 -C
 
 # Add the RDS root certs so we can make connections to RDS over TLS
 RUN curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o us-east-1-bundle.pem
-RUN ${TMP_ROOT}/usr/local/jdk-11.0.11+9/bin/keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
-  ${TMP_ROOT}/usr/local/jdk-11.0.11+9/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
+RUN ${TMP_ROOT}/usr/local/${JVM_VERSION}/bin/keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
+  ${TMP_ROOT}/usr/local/${JVM_VERSION}/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
 
 RUN chmod +x ${TMP_ROOT}/flyway/flyway
 RUN ln -s ${TMP_ROOT}/flyway/flyway ${TMP_ROOT}/usr/local/bin/flyway
@@ -65,6 +68,6 @@ ENV LANG=en_US.UTF-8 \
   LANGUAGE=en_US:en \
   LC_ALL=en_US.UTF-8 \
   JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" \
-  JAVA_HOME=/usr/local/jdk-11.0.11+9
+  JAVA_HOME=/usr/local/jdk-17.0.7+7
 ENV PATH=${JAVA_HOME}/bin:/flyway:${PATH}
 USER flywayuser:flywayuser

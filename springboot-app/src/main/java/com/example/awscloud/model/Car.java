@@ -4,8 +4,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Year;
 import jakarta.persistence.*;
 
+
 @Entity
-@Table(name = "cars")
+@Table(name = "cars", schema = "demoapp")
 public class Car {
 
   @Id
@@ -30,8 +31,7 @@ public class Car {
   private String color;
 
   @JsonProperty("description")
-  @Lob
-  @Column(name = "description", nullable = false)
+  @Column(name = "description", nullable = false, columnDefinition = "text")
   private String description;
 
   public Car() {}

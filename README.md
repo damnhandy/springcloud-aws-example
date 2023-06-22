@@ -81,7 +81,10 @@ time, it is normal to see the SpringBoot app fail to connect to Postgres in the 
 The SpringBoot app has a `restart` policy of `always` which will restart the app on failure.
 Eventually, the application will stabilize, and you should be able to hit the following URIs:
 
-http://localhost:8080/cars/11 http://localhost:8081/actuator/info
+http://localhost:8080/cars/11
+
+http://localhost:8081/actuator/info
+
 http://localhost:8081/actuator/health
 
 ## AWS CDK Deployment
