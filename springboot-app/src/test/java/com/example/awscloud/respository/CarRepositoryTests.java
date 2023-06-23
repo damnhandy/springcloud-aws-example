@@ -17,8 +17,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.ContextConfiguration;
 
-
-@DataJpaTest()
+@DataJpaTest
 @AutoConfigureTestEntityManager
 @ActiveProfiles("test")
 public class CarRepositoryTests {

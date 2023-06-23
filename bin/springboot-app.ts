@@ -3,13 +3,14 @@ import "source-map-support/register";
 import * as cp from "child_process";
 import * as cdk from "aws-cdk-lib";
 import { ApplicationStack } from "../lib/application-stack";
+import { DatabaseStack } from "../lib/database-stack";
 import { FoundationStack } from "../lib/foundation-stack";
-
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
 const destinationKeyPrefix = "data-jobs";
 const destinationFileName = "data-migration.zip";
 const sourceZipPath = "../data-migration-out";
+
 /**
  *
  */
@@ -29,6 +30,17 @@ const foundationStack = new FoundationStack(app, "SpringBootDemoFoundationStack"
   destinationFileName: destinationFileName,
   sourceZipPath: sourceZipPath,
   revision: revision
+});
+
+const dbStack = new DatabaseStack(app, "DatabaseStack", {
+  artifactsBucket: foundationStack.artifactsBucket,
+  revision: revision,
+  serviceName: serviceName,
+  vpc: foundationStack.networking.vpc,
+  destinationKeyPrefix: destinationKeyPrefix,
+  destinationFileName: destinationFileName,
+  sourceZipPath: sourceZipPath,
+  kmsKey: foundationStack.kmsKey
 });
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {

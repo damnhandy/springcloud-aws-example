@@ -12,7 +12,7 @@ openssl rand -base64 32 > ./credentials/jdbc_truststore_password
 openssl req -new -x509 -days 365 -nodes -out ./credentials/ca.crt -keyout ./credentials/ca.key -subj "/CN=postgres"
 openssl req -new -nodes -out ./credentials/server.csr -keyout ./credentials/server.key -subj "/CN=postgres"
 openssl x509 -req -in ./credentials/server.csr -days 365 -CA ./credentials/ca.crt -CAkey ./credentials/ca.key -CAcreateserial -out ./credentials/server.crt
-openssl rsa -inform pem -in ./credentials/server.key  -outform der -out ./credentials/server.key.der
+openssl rsa -inform pem -in ./credentials/server.key -outform der -out ./credentials/server.key.der
 
 chmod 0600 ./credentials/server.key
 chmod 0600 ./credentials/server.key.der

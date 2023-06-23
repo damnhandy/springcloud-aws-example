@@ -1,7 +1,7 @@
 package com.example.awscloud.model;
 
-import java.time.Year;
 import jakarta.persistence.AttributeConverter;
+import java.time.Year;
 
 /**
  * <p>

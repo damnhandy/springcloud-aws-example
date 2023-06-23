@@ -1,0 +1,62 @@
+plugins {
+    id 'java'
+    id 'maven-publish'
+    id 'org.graalvm.buildtools.native' version '0.9.23'
+}
+
+group = 'com.example.dbmigrator'
+version = '1.0.0'
+
+
+compileJava   {
+    sourceCompatibility = '17'
+    targetCompatibility = '17'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation platform('software.amazon.awssdk:bom:2.20.91')
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.15.2')
+    implementation("org.flywaydb:flyway-core:9.20.0")
+    implementation('software.amazon.awssdk:s3')
+    implementation('com.amazonaws:aws-lambda-java-core:1.2.2')
+    implementation('com.fasterxml.jackson.core:jackson-core')
+    implementation('com.fasterxml.jackson.core:jackson-databind')
+    testImplementation('org.junit.jupiter:junit-jupiter-api:5.9.3')
+    testRuntimeOnly ('org.junit.jupiter:junit-jupiter-engine')
+}
+
+
+tasks.register('buildZip', Zip) {
+    from compileJava
+    from processResources
+    into('lib') {
+        from configurations.runtimeClasspath
+    }
+}
+
+test {
+    useJUnitPlatform()
+    // The AWS v1 SDK will fail if the region is not set, so we configure it via system property. The unit tests
+    // do not call any AWS resources, this is simply a means to ensure that the tests don't fail on resolving the
+    // region in the AwsRegionProviderChain.java.
+    systemProperty("aws.region","us-east-1")
+    testLogging {
+        events "failed"
+        debug {
+            events "started", "skipped", "failed"
+            exceptionFormat "full"
+        }
+        info.events = ["failed", "skipped"]
+    }
+}
+
+build.dependsOn buildZip

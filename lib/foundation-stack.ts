@@ -6,7 +6,7 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
-import { DatabaseConstruct } from "./database-construct";
+import { DatabaseStack } from "./database-stack";
 import { EcrRepoWithLifecycle } from "./ecr-construct";
 import { ParamNames } from "./names";
 import { BasicNetworking, IBasicNetworking } from "./network-construct";
@@ -79,7 +79,7 @@ export class FoundationStack extends cdk.Stack {
       removalPolicy: RemovalPolicy.DESTROY // this is an ill-advised policy for production apps
     });
 
-    new DatabaseConstruct(this, "DB", {
+    new DatabaseStack(this, "DB", {
       artifactsBucket: this.artifactsBucket,
       revision: props.revision,
       serviceName: props.serviceName,

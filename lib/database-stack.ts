@@ -1,8 +1,10 @@
 import * as cdk from "aws-cdk-lib";
+import { triggers } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { InstanceClass, InstanceSize, InstanceType, IVpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import { IKey } from "aws-cdk-lib/aws-kms";
+import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as rds from "aws-cdk-lib/aws-rds";
 import { IDatabaseCluster } from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -24,7 +26,7 @@ export interface DatabaseStackProps extends cdk.StackProps {
   readonly sourceZipPath: string;
 }
 
-export class DatabaseConstruct extends Construct {
+export class DatabaseStack extends cdk.Stack {
   public dbCluster: IDatabaseCluster;
   public dbUrl: IStringParameter;
   public dbAdminUsername: IStringParameter;
@@ -121,6 +123,13 @@ export class DatabaseConstruct extends Construct {
     function buildJdbcUrl(dbCluster: rds.IDatabaseCluster): string {
       return `jdbc:mysql://${dbCluster.clusterEndpoint.hostname}:3306/${props.serviceName}`;
     }
+
+    const dbTriggerFunction = new triggers.TriggerFunction(this, "MyTrigger", {
+      runtime: lambda.Runtime.JAVA_17,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(`${__dirname}/my-trigger`)
+    });
+    dbTriggerFunction.executeAfter(this.dbCluster);
 
     new FlywayProject(this, "Flyway", {
       env: props.env,
