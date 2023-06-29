@@ -79,7 +79,7 @@ services:
       FLYWAY_PLACEHOLDERS_APPUSERPW: /run/secrets/appuser_password
       JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
     volumes:
-      - ./flyway-container/flyway-migrate.sh:/flyway-migrate.sh
+      - ./flyway-migrate.sh:/flyway-migrate.sh
       - ./data-migration/sql:/sql
     entrypoint:
       - /flyway-migrate.sh

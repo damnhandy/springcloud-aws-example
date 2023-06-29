@@ -13,8 +13,6 @@ mkShell {
       export NODE_PATH=~/.nix-node
       npm config set prefix=~/.nix-node
       export PATH=$NODE_PATH/bin:$PATH
-      export CDK_DEFAULT_ACCOUNT=799104667460
-      export CDK_DEFAULT_REGION=us-east-1
       npm install npm -g 
   '';
 }

@@ -48,14 +48,14 @@ export class ParamNames {
     name: `artifacts/name`
   });
 
-  public static readonly MYSQL_SG_ID = ParamNames.envPath({
+  public static readonly PG_SG_ID = ParamNames.envPath({
     context: "security-groups",
-    name: `mysql/${ParamNames.APP_NAME}/id`
+    name: `postgres/${ParamNames.APP_NAME}/id`
   });
 
-  public static readonly MYSQL_ADMIN_SECRET = ParamNames.appSecretPath({
-    context: "mysql",
-    name: "admin"
+  public static readonly PG_ADMIN_SECRET = ParamNames.appSecretPath({
+    context: "postgres",
+    name: "postgres"
   });
 
   public static readonly DEMO_APP_USER_SECRET = ParamNames.appSecretPath({

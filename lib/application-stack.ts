@@ -1,7 +1,6 @@
 import * as path from "path";
-import * as cdk from "aws-cdk-lib";
-import { RemovalPolicy } from "aws-cdk-lib";
-import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
+import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
+import { IVpc, Port, Vpc } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import { LogDriver } from "aws-cdk-lib/aws-ecs";
@@ -15,18 +14,17 @@ import { IKey, Key } from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
 import { ParamNames } from "./names";
+import { LookupUtils } from "./lookup-utils";
 
 /**
  *
  */
-export interface ApplicationStackProps extends cdk.StackProps {
-  readonly vpc: IVpc;
+export interface ApplicationStackProps extends StackProps {
   readonly serviceName: string;
   readonly revision: string;
   readonly artifactsBucket: s3.IBucket;
@@ -38,7 +36,7 @@ export interface ApplicationStackProps extends cdk.StackProps {
 /**
  *
  */
-export class ApplicationStack extends cdk.Stack {
+export class ApplicationStack extends Stack {
   appRepo: IRepository;
   vpc: IVpc;
   kmsKey: IKey;
@@ -46,18 +44,12 @@ export class ApplicationStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: ApplicationStackProps) {
     super(scope, id, props);
 
-    this.vpc = props.vpc;
+    this.vpc = LookupUtils.vpcLookup(this, "VpcLookup");
     this.kmsKey = Key.fromKeyArn(
       this,
-      "KmsKey",
-      StringParameter.fromStringParameterName(this, "KmsRef", ParamNames.KMS_ARN).stringValue
+      "KmsKeyRef",
+      StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
     );
-
-    const sqlDataDeployment = new s3deploy.BucketDeployment(this, "CopySQLData", {
-      sources: [s3deploy.Source.asset(path.resolve(__dirname, props.sourceZipPath))],
-      destinationBucket: props.artifactsBucket,
-      destinationKeyPrefix: props.destinationKeyPrefix
-    });
 
     const appUserCredentials = Secret.fromSecretNameV2(
       this,
@@ -69,8 +61,6 @@ export class ApplicationStack extends cdk.Stack {
       vpc: this.vpc,
       containerInsights: true
     });
-    // Ensure that the S3 deployment happens BEFORE the creation of the ECS resources
-    cluster.node.addDependency(sqlDataDeployment);
 
     const logGroup = new logs.LogGroup(this, "LogGroup", {
       encryptionKey: this.kmsKey,
@@ -92,7 +82,9 @@ export class ApplicationStack extends cdk.Stack {
           logGroup,
           streamPrefix: `${props.serviceName}`
         }),
-        image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app")),
+        image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app"), {
+          assetName: "springboot-app"
+        }),
         containerPort: 8080,
         environment: {
           SPRING_PROFILES_ACTIVE: "aws",

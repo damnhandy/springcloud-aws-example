@@ -1,18 +1,22 @@
 import * as cdk from "aws-cdk-lib";
-import { RemovalPolicy } from "aws-cdk-lib";
+import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
-import { DatabaseStack } from "./database-stack";
+
 import { EcrRepoWithLifecycle } from "./ecr-construct";
 import { ParamNames } from "./names";
 import { BasicNetworking, IBasicNetworking } from "./network-construct";
-export interface FoundationStackProps extends cdk.StackProps {
+
+/**
+ * Test
+ */
+export interface FoundationStackProps extends StackProps {
   /**
-   * The name of the service and its assocated database.
+   * The name of the service and its associated database.
    */
   readonly serviceName: string;
   /**
@@ -29,17 +33,16 @@ export interface FoundationStackProps extends cdk.StackProps {
  * Base stack that sets up foundational resources that maintains resources that should not be
  * deleted.
  */
-export class FoundationStack extends cdk.Stack {
+export class FoundationStack extends Stack {
   public kmsKey: kms.Key;
   public artifactsBucket: s3.IBucket;
-  public networking: IBasicNetworking;
   public appRepo: IRepository;
-  public flywayRepo: IRepository;
 
   constructor(scope: Construct, id: string, props: FoundationStackProps) {
     super(scope, id, props);
-
-    this.networking = new BasicNetworking(this, "VPC");
+    if (props.env === undefined) {
+      throw new Error("props.env is undefined");
+    }
 
     this.kmsKey = new kms.Key(this, "DemoAppKey", {
       enableKeyRotation: true,
@@ -77,17 +80,6 @@ export class FoundationStack extends cdk.Stack {
       },
       versioned: true,
       removalPolicy: RemovalPolicy.DESTROY // this is an ill-advised policy for production apps
-    });
-
-    new DatabaseStack(this, "DB", {
-      artifactsBucket: this.artifactsBucket,
-      revision: props.revision,
-      serviceName: props.serviceName,
-      vpc: this.networking.vpc,
-      destinationKeyPrefix: props.destinationKeyPrefix,
-      destinationFileName: props.destinationFileName,
-      sourceZipPath: props.sourceZipPath,
-      kmsKey: this.kmsKey
     });
 
     new StringParameter(this, "ArtifactsBucketArnParam", {

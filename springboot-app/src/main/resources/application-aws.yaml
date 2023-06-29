@@ -20,11 +20,11 @@ spring:
     name: demoapp
   config:
     import:
-      - "aws-secretsmanager:/secret/${spring.application.name}/appuser"
+      - "aws-secretsmanager:/secret/${spring.application.name}/appuser?postgres"
   datasource:
-    url: "jdbc:postgress://${host}:${port}/demoapp"
-    username: "appuser"
-    password: "${password}"
+    url: "jdbc:postgress://${postgres.host}:${postgres.port}/demoapp"
+    username: "${postgres.username}"
+    password: "${postgres.password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
