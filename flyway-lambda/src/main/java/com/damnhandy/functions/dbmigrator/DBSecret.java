@@ -1,9 +1,12 @@
 package com.damnhandy.functions.dbmigrator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Optional;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DBSecret {
 
     private String engine;
@@ -21,7 +24,12 @@ public class DBSecret {
     private Optional<String> jdbcUrl;
 
     @JsonCreator
-    public DBSecret(String engine, String host, String username, String password, String dbname, String port) {
+    public DBSecret(@JsonProperty("engine") String engine,
+                    @JsonProperty("host") String host,
+                    @JsonProperty("username") String username,
+                    @JsonProperty("password") String password,
+                    @JsonProperty("dbname") String dbname,
+                    @JsonProperty("port") String port) {
         this.engine = engine;
         this.host = host;
         this.username = username;

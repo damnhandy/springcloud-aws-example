@@ -20,11 +20,12 @@ import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import { ISecret, SecretRotation, SecretRotationApplication } from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { IStringParameter, StringParameter } from "aws-cdk-lib/aws-ssm";
-import { Duration } from "aws-cdk-lib/core";
+
 import { Construct } from "constructs";
 import { DBMigrationConstruct } from "./flyway-dbmigrator";
 import { LookupUtils } from "./lookup-utils";
 import { ParamNames } from "./names";
+import { randomUUID } from "crypto";
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
@@ -34,7 +35,6 @@ export interface DatabaseStackProps extends cdk.StackProps {
 export class DatabaseStack extends cdk.Stack {
   public dbCluster: DatabaseCluster;
   public dbUrl: IStringParameter;
-  public dbAdminUsername: IStringParameter;
   public dbAdminCreds: ISecret;
   public appUserCreds: ISecret;
   kmsKey: IKey;
@@ -81,6 +81,7 @@ export class DatabaseStack extends cdk.Stack {
 
     this.dbCluster = new DatabaseCluster(this, "DBCluster", {
       defaultDatabaseName: props.serviceName,
+      clusterIdentifier: `${props.serviceName}-cluster`,
       parameterGroup: parameterGroup,
       credentials: Credentials.fromSecret(this.dbAdminCreds),
       storageEncryptionKey: this.kmsKey,
@@ -98,7 +99,7 @@ export class DatabaseStack extends cdk.Stack {
       deletionProtection: false,
       vpc: this.vpc,
       vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.4.1", "100.64.16.1"])]
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.100", "100.64.16.100"])]
       })
     });
 
@@ -152,6 +153,26 @@ export class DatabaseStack extends cdk.Stack {
     this.dbUrl = new ssm.StringParameter(this, "JdbcUrlSSMParam", {
       parameterName: ParamNames.JDBC_URL,
       stringValue: buildJdbcUrl(this.dbCluster)
+    });
+
+    const dbMigrator = new DBMigrationConstruct(this, "DBMigrate", {
+      vpc: this.vpc,
+      vpcSubnets: this.vpc.selectSubnets({
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.8.100"])]
+      }),
+      database: this.dbCluster,
+      masterPassword: this.dbCluster.secret || this.dbAdminCreds,
+      encryptionKey: this.kmsKey,
+      locations: new s3assets.Asset(this, `DataMigrationAssets${randomUUID()}`, {
+        deployTime: false,
+        path: path.resolve(__dirname, "../data-migration/sql")
+      }),
+      placeholders: {
+        appuser: "appuser"
+      },
+      secretPlaceHolders: {
+        appuserSecret: this.appUserCreds
+      }
     });
 
     function buildJdbcUrl(dbCluster: IDatabaseCluster): string {

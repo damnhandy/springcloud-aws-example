@@ -1,6 +1,6 @@
 import * as path from "path";
 import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
-import { IVpc, Port, Vpc } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
 import { LogDriver } from "aws-cdk-lib/aws-ecs";
@@ -13,13 +13,13 @@ import {
 import { IKey, Key } from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";
-import * as s3 from "aws-cdk-lib/aws-s3";
+
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { ParamNames } from "./names";
 import { LookupUtils } from "./lookup-utils";
+import { ParamNames } from "./names";
 
 /**
  *
@@ -27,10 +27,6 @@ import { LookupUtils } from "./lookup-utils";
 export interface ApplicationStackProps extends StackProps {
   readonly serviceName: string;
   readonly revision: string;
-  readonly artifactsBucket: s3.IBucket;
-  readonly destinationKeyPrefix: string;
-  readonly destinationFileName: string;
-  readonly sourceZipPath: string;
 }
 
 /**

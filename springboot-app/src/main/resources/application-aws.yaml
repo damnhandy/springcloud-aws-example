@@ -22,7 +22,7 @@ spring:
     import:
       - "aws-secretsmanager:/secret/${spring.application.name}/appuser?postgres"
   datasource:
-    url: "jdbc:postgress://${postgres.host}:${postgres.port}/demoapp"
+    url: "jdbc:postgresql://${postgres.host}:${postgres.port}/demoapp"
     username: "${postgres.username}"
     password: "${postgres.password}"
     hikari:

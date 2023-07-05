@@ -17,6 +17,7 @@ import org.zapodot.junit.db.annotations.EmbeddedDatabase;
 import org.zapodot.junit.db.annotations.EmbeddedDatabaseTest;
 import org.zapodot.junit.db.common.CompatibilityMode;
 import org.zapodot.junit.db.common.Engine;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.lambda.powertools.cloudformation.Response;
 import software.amazon.lambda.powertools.parameters.SecretsProvider;
@@ -37,11 +38,7 @@ import static org.mockito.Mockito.when;
 @EmbeddedDatabaseTest(
         engine = Engine.H2,
         compatibilityMode = CompatibilityMode.PostgreSQL,
-        name = "unitests",
-        properties = {
-                @ConfigurationProperty(name = "username", value = "testuser"),
-                @ConfigurationProperty(name = "password", value = "dummypassword")
-        })
+        name = "unitests")
 @ExtendWith(S3.class)
 @ExtendWith(MockitoExtension.class)
 public class DBMigraorHandlerTests {
@@ -73,7 +70,7 @@ public class DBMigraorHandlerTests {
 
         DBSecret secret = secretsProvider.get("/foo",DBSecret.class);
         Assertions.assertNotNull(s3Client);
-        DBMigratorHandler handler = new DBMigratorHandler(secretsProvider);
+        DBMigratorHandler handler = new DBMigratorHandler(secretsProvider,s3Client);
         Response response = handler.handleRequest(event,mockContext);
         assertTrue(response.getStatus() == Response.Status.SUCCESS);
         try(final Statement statement = connection.createStatement();
@@ -87,7 +84,7 @@ public class DBMigraorHandlerTests {
             type = CloudFormationCustomResourceEvent.class)
     public void testOnUpdate(CloudFormationCustomResourceEvent event) throws Exception {
         Assertions.assertNotNull(s3Client);
-        DBMigratorHandler handler = new DBMigratorHandler();
+        DBMigratorHandler handler = new DBMigratorHandler(secretsProvider,s3Client);
         Response response = handler.handleRequest(event,mockContext);
         assertTrue(response.getStatus() == Response.Status.SUCCESS);
     }

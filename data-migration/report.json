@@ -1,0 +1,325 @@
+{
+  "individualResults": [
+    {
+      "schemaVersion": "1",
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "initial",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Ignored (Baseline)",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V1__initial.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        },
+        {
+          "category": "",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "\u003c\u003c Flyway Baseline \u003e\u003e",
+          "type": "BASELINE",
+          "installedOnUTC": "2023-07-05T21:52:26.619679Z",
+          "state": "Baseline",
+          "undoable": "No",
+          "filepath": "",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 0
+        },
+        {
+          "category": "Versioned",
+          "version": "2",
+          "rawVersion": "2",
+          "description": "app user",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "rawVersion": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        }
+      ],
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "allSchemasEmpty": false,
+      "timestamp": "2023-07-05T14:06:50.564992",
+      "operation": "info",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "schemaVersion": null,
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "initial",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V1__initial.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        },
+        {
+          "category": "Versioned",
+          "version": "2",
+          "rawVersion": "2",
+          "description": "app user",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "rawVersion": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        }
+      ],
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "allSchemasEmpty": true,
+      "timestamp": "2023-07-05T14:08:25.091284",
+      "operation": "info",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "initialSchemaVersion": "1",
+      "targetSchemaVersion": "3",
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "2",
+          "description": "app user",
+          "type": "SQL",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "executionTime": 429
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "executionTime": 39357
+        }
+      ],
+      "migrationsExecuted": 2,
+      "success": true,
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "warnings": [],
+      "timestamp": "2023-07-05T14:10:02.508059",
+      "operation": "migrate",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "schemaVersion": "3",
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "initial",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-05T18:08:55.030055Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V1__initial.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 232
+        },
+        {
+          "category": "Versioned",
+          "version": "2",
+          "rawVersion": "2",
+          "description": "app user",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-05T18:10:04.279429Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 429
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "rawVersion": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-05T18:10:05.234512Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 39357
+        }
+      ],
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "allSchemasEmpty": false,
+      "timestamp": "2023-07-05T14:10:52.407275",
+      "operation": "info",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "schemaVersion": "1",
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "initial",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-05T22:35:42.313829Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V1__initial.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 41
+        },
+        {
+          "category": "Versioned",
+          "version": "2",
+          "rawVersion": "2",
+          "description": "app user",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "rawVersion": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "installedOnUTC": "",
+          "state": "Pending",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "undoFilepath": "",
+          "installedBy": "",
+          "executionTime": 0
+        }
+      ],
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "allSchemasEmpty": false,
+      "timestamp": "2023-07-05T14:46:40.480242",
+      "operation": "info",
+      "exception": null,
+      "licenseFailed": false
+    },
+    {
+      "schemaVersion": "3",
+      "schemaName": "",
+      "migrations": [
+        {
+          "category": "Versioned",
+          "version": "1",
+          "rawVersion": "1",
+          "description": "initial",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-05T22:35:42.313829Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V1__initial.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 41
+        },
+        {
+          "category": "Versioned",
+          "version": "2",
+          "rawVersion": "2",
+          "description": "app user",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-06T00:02:20.907674Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V2__app_user.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 56
+        },
+        {
+          "category": "Versioned",
+          "version": "3",
+          "rawVersion": "3",
+          "description": "tables and data",
+          "type": "SQL",
+          "installedOnUTC": "2023-07-06T00:02:21.112424Z",
+          "state": "Success",
+          "undoable": "No",
+          "filepath": "/Users/mcdrya/Projects/Examples/springcloud-aws-example/data-migration/sql/V3__tables_and_data.sql",
+          "undoFilepath": "",
+          "installedBy": "postgres",
+          "executionTime": 2286
+        }
+      ],
+      "flywayVersion": "9.20.0",
+      "database": "demoapp",
+      "allSchemasEmpty": false,
+      "timestamp": "2023-07-05T16:04:12.806560",
+      "operation": "info",
+      "exception": null,
+      "licenseFailed": false
+    }
+  ]
+}

@@ -6,13 +6,10 @@ import * as cdk from "aws-cdk-lib";
 import { App } from "aws-cdk-lib";
 import { ApplicationStack } from "../lib/application-stack";
 import { DatabaseStack } from "../lib/database-stack";
-import { FlywayResourceStack } from "../lib/flyway-resource";
+import { EC2TesterStack } from "../lib/ec2-tester";
 import { FoundationStack } from "../lib/foundation-stack";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
-const destinationKeyPrefix = "data-jobs";
-const destinationFileName = "data-migration.zip";
-const sourceZipPath = "../data-migration-out";
 
 /**
  *
@@ -25,7 +22,7 @@ const defaultStackSynthesizer = AppStagingSynthesizer.defaultResources({
 });
 
 const app = new App({
-  defaultStackSynthesizer: defaultStackSynthesizer
+  //defaultStackSynthesizer: defaultStackSynthesizer
 });
 
 const env = {
@@ -36,9 +33,6 @@ const env = {
 const foundationStack = new FoundationStack(app, "FoundationStack", {
   env: env,
   serviceName: serviceName,
-  destinationKeyPrefix: destinationKeyPrefix,
-  destinationFileName: destinationFileName,
-  sourceZipPath: sourceZipPath,
   revision: revision
 });
 
@@ -50,24 +44,18 @@ const dbStack = new DatabaseStack(app, "DatabaseStack", {
 });
 dbStack.addDependency(foundationStack);
 
-const flywayStack = new FlywayResourceStack(app, "FlyWayStack", {
-  dbCluster: dbStack.dbCluster,
-  masterPassword: dbStack.dbAdminCreds
+const ec2Stack = new EC2TesterStack(app, "EC2TesterStack", {
+  env: env,
+  dbCluster: dbStack.dbCluster
 });
-flywayStack.addDependency(dbStack);
 
-// const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
-//   env: env,
-//   serviceName: serviceName,
-//   destinationKeyPrefix: destinationKeyPrefix,
-//   destinationFileName: destinationFileName,
-//   sourceZipPath: sourceZipPath,
-//   artifactsBucket: foundationStack.artifactsBucket,
-//   revision: revision,
-//   vpc: foundationStack.networking.vpc
-// });
-// appStack.addDependency(foundationStack);
-// appStack.addDependency(dbStack);
+const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
+  env: env,
+  serviceName: serviceName,
+  revision: revision
+});
+appStack.addDependency(foundationStack);
+appStack.addDependency(dbStack);
 
 app.synth({
   validateOnSynthesis: true

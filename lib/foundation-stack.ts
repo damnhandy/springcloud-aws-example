@@ -9,7 +9,6 @@ import { Construct } from "constructs";
 
 import { EcrRepoWithLifecycle } from "./ecr-construct";
 import { ParamNames } from "./names";
-import { BasicNetworking, IBasicNetworking } from "./network-construct";
 
 /**
  * Test
@@ -23,10 +22,6 @@ export interface FoundationStackProps extends StackProps {
    * The revision identifier
    */
   readonly revision: string;
-
-  readonly destinationKeyPrefix: string;
-  readonly destinationFileName: string;
-  readonly sourceZipPath: string;
 }
 
 /**

@@ -1,16 +1,16 @@
 import * as cp from "child_process";
 import * as path from "path";
 import { BundlingOutput, CustomResource, RemovalPolicy, Size, StageProps } from "aws-cdk-lib";
-import { IVpc, SubnetSelection } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Peer, Port, SecurityGroup, SubnetSelection } from "aws-cdk-lib/aws-ec2";
 import { IKey } from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { Code, Runtime } from "aws-cdk-lib/aws-lambda";
-import { IDatabaseCluster } from "aws-cdk-lib/aws-rds";
+import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
+import { DatabaseCluster, DatabaseSecret, IDatabaseCluster } from "aws-cdk-lib/aws-rds";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
+import { ISecret, Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { Duration } from "aws-cdk-lib/core";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { Construct } from "constructs";
-import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 
 /**
  *
@@ -20,9 +20,11 @@ export interface DBMigrationConstructProps extends StageProps {
   readonly vpcSubnets: SubnetSelection;
   readonly encryptionKey: IKey;
   readonly locations: s3assets.Asset;
-  readonly database: IDatabaseCluster;
+  readonly database: DatabaseCluster;
   readonly masterPassword: ISecret;
   readonly ephemeralStorageSize?: Size;
+  readonly placeholders: { [key: string]: string };
+  readonly secretPlaceHolders?: { [key: string]: ISecret };
 }
 
 /**
@@ -30,6 +32,7 @@ export interface DBMigrationConstructProps extends StageProps {
  */
 export class DBMigrationConstruct extends Construct {
   public readonly response: string;
+  private resolvedSecretPlaceHolders?: { [key: string]: string };
   constructor(scope: Construct, id: string, props: DBMigrationConstructProps) {
     super(scope, id);
 
@@ -63,6 +66,7 @@ export class DBMigrationConstruct extends Construct {
           }
         }
       }),
+      tracing: Tracing.ACTIVE,
       handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
       runtime: Runtime.JAVA_17,
       ephemeralStorageSize: props.ephemeralStorageSize || Size.mebibytes(512),
@@ -90,12 +94,33 @@ export class DBMigrationConstruct extends Construct {
     props.masterPassword.grantRead(fn);
     props.locations.grantRead(fn);
     props.database.connections.allowDefaultPortFrom(fn);
+    if (props.secretPlaceHolders) {
+      this.resolvedSecretPlaceHolders = {};
+      for (const k in props.secretPlaceHolders) {
+        props.secretPlaceHolders[k].grantRead(fn);
+        this.resolvedSecretPlaceHolders[k] = props.secretPlaceHolders[k].secretName;
+      }
+    }
+    fn.connections.allowTo(Peer.ipv4("10.105.112.0/21"), Port.tcp(443));
+    fn.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
+    fn.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
+
+    const providerSg = new SecurityGroup(this, "ProviderSG", {
+      vpc: props.vpc,
+      allowAllOutbound: false,
+      disableInlineRules: true
+    });
+
+    providerSg.connections.allowTo(Peer.ipv4("10.105.112.0/21"), Port.tcp(443));
+    providerSg.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
+    providerSg.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
 
     const provider = new Provider(this, `${id}Provider`, {
       onEventHandler: fn,
       vpc: props.vpc,
       vpcSubnets: props.vpcSubnets,
-      providerFunctionName: "DBMigrationFunctionProvider"
+      providerFunctionName: "DBMigrationFunctionProvider",
+      securityGroups: [providerSg]
     });
     provider.node.addDependency(props.database);
 
@@ -107,14 +132,11 @@ export class DBMigrationConstruct extends Construct {
         masterSecret: props.masterPassword.secretName,
         locations: props.locations.s3ObjectUrl,
         mixed: true,
-        placeHolders: {
-          appuser: "appuser",
-          appuserSecret: "foobar"
-        }
+        placeHolders: props.placeholders,
+        secretPlaceHolders: this.resolvedSecretPlaceHolders
       }
     });
     cr.node.addDependency(props.database);
-
     this.response = cr.getAtt("Response").toString();
   }
 }
