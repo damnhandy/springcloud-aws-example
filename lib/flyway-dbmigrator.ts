@@ -5,12 +5,13 @@ import { IVpc, Peer, Port, SecurityGroup, SubnetSelection } from "aws-cdk-lib/aw
 import { IKey } from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
-import { DatabaseCluster, DatabaseSecret, IDatabaseCluster } from "aws-cdk-lib/aws-rds";
+import { DatabaseCluster } from "aws-cdk-lib/aws-rds";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
-import { ISecret, Secret } from "aws-cdk-lib/aws-secretsmanager";
+import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { Duration } from "aws-cdk-lib/core";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { Construct } from "constructs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 /**
  *
@@ -86,7 +87,7 @@ export class DBMigrationConstruct extends Construct {
       ),
       allowAllOutbound: false,
       environment: {
-        POWERTOOLS_LOG_LEVEL: "DEBUG",
+        POWERTOOLS_LOG_LEVEL: "INFO",
         POWERTOOLS_SERVICE_NAME: "DBMigrator"
       }
     });
@@ -120,7 +121,8 @@ export class DBMigrationConstruct extends Construct {
       vpc: props.vpc,
       vpcSubnets: props.vpcSubnets,
       providerFunctionName: "DBMigrationFunctionProvider",
-      securityGroups: [providerSg]
+      securityGroups: [providerSg],
+      logRetention: RetentionDays.FIVE_DAYS
     });
     provider.node.addDependency(props.database);
 

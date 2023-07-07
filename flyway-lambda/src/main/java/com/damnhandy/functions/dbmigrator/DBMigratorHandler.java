@@ -11,12 +11,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
-import org.flywaydb.core.api.output.BaselineResult;
 import org.flywaydb.core.api.output.MigrateResult;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Uri;
 import software.amazon.awssdk.services.s3.S3Utilities;
@@ -40,9 +38,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
 
-import static software.amazon.awssdk.transfer.s3.SizeConstant.MB;
 import static software.amazon.lambda.powertools.utilities.EventDeserializer.extractDataFrom;
 
+/**
+ * This is lambda function that backs a CDK custom resource that performs database migrations using
+ * Flyway Community.
+ */
 public class DBMigratorHandler extends AbstractCustomResourceHandler {
     private static final Logger logger = LogManager.getLogger(DBMigratorHandler.class);
 
@@ -68,7 +69,6 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         this.secretsProvider = ParamManager.getSecretsProvider();
         this.s3Client = S3Client.builder()
                 .credentialsProvider(DefaultCredentialsProvider.create())
-                .region(Region.of(System.getenv("AWS_REGION")))
                 .build();
     }
 
@@ -148,6 +148,7 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
                     .value(result.success)
                     .status(Response.Status.SUCCESS)
                     .physicalResourceId(physicalResourceId)
+                    .objectMapper(objectMapper)
                     .build();
         }
         catch (FlywayException e) {
@@ -156,6 +157,7 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
                     .value(e.getMessage())
                     .status(Response.Status.FAILED)
                     .physicalResourceId(physicalResourceId)
+                    .objectMapper(objectMapper)
                     .build();
         }
     }
@@ -167,6 +169,7 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
                 .value("No action")
                 .status(Response.Status.SUCCESS)
                 .physicalResourceId(event.getPhysicalResourceId())
+                .objectMapper(objectMapper)
                 .build();
     }
 
@@ -182,9 +185,9 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         Path downloadLocation = getSqlAsset(s3Uri);
         var dirname = filename.substring(0,filename.length() - 4);
         // Unzip the CDK asset containing the SQL files to ephemeral lambda storage in /tmp
-        Path sqlOutput = Files.createDirectory(Paths.get("/tmp",dirname));
+        Path sqlOutput = Files.createTempDirectory(dirname);
         UnzipUtil.unzip(downloadLocation.toAbsolutePath(), sqlOutput.toAbsolutePath());
-
+        // check that the ZIP file has extracted properly
         if(isDirEmpty(sqlOutput)) {
             throw new RuntimeException("SQL Output Dir is empty");
         }
@@ -219,6 +222,12 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         return downloadLocation;
     }
 
+    /**
+     * Check that a directory contains files or not
+     * @param path the path of the directory
+     * @return true if the directory contains files.
+     * @throws IOException
+     */
     public boolean isDirEmpty(Path path) throws IOException {
         if (Files.isDirectory(path)) {
             try (DirectoryStream<Path> directory = Files.newDirectoryStream(path)) {

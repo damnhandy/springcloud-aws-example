@@ -6,7 +6,7 @@ import * as cdk from "aws-cdk-lib";
 import { App } from "aws-cdk-lib";
 import { ApplicationStack } from "../lib/application-stack";
 import { DatabaseStack } from "../lib/database-stack";
-import { EC2TesterStack } from "../lib/ec2-tester";
+import { Ec2RdsBastionStack } from "../lib/ec2-rds-bastion-stack";
 import { FoundationStack } from "../lib/foundation-stack";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
@@ -44,18 +44,18 @@ const dbStack = new DatabaseStack(app, "DatabaseStack", {
 });
 dbStack.addDependency(foundationStack);
 
-const ec2Stack = new EC2TesterStack(app, "EC2TesterStack", {
+const ec2Stack = new Ec2RdsBastionStack(app, "RDSBastionStack", {
   env: env,
   dbCluster: dbStack.dbCluster
 });
 
-const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
-  env: env,
-  serviceName: serviceName,
-  revision: revision
-});
-appStack.addDependency(foundationStack);
-appStack.addDependency(dbStack);
+// const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
+//   env: env,
+//   serviceName: serviceName,
+//   revision: revision
+// });
+// appStack.addDependency(foundationStack);
+// appStack.addDependency(dbStack);
 
 app.synth({
   validateOnSynthesis: true

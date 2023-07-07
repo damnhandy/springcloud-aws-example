@@ -10,33 +10,21 @@ import {
   SecurityGroup,
   SubnetFilter
 } from "aws-cdk-lib/aws-ec2";
-import { CfnPullThroughCacheRule } from "aws-cdk-lib/aws-ecr";
+
 import { Role, ServicePrincipal, ManagedPolicy } from "aws-cdk-lib/aws-iam";
 import { IDatabaseCluster } from "aws-cdk-lib/aws-rds";
 import { Construct } from "constructs";
 import { LookupUtils } from "./lookup-utils";
 
-export interface EC2TesterStackProps extends StackProps {
+export interface EC2RdsBastionProps extends StackProps {
   readonly dbCluster: IDatabaseCluster;
 }
 /**
  * This stack is used to test the shared VPC. It creates an EC2 instance in the infra VPC only in experimental deployments only.
  */
-export class EC2TesterStack extends Stack {
-  constructor(scope: Construct, id: string, props: EC2TesterStackProps) {
+export class Ec2RdsBastionStack extends Stack {
+  constructor(scope: Construct, id: string, props: EC2RdsBastionProps) {
     super(scope, id, props);
-
-    /**
-     * Creates a pull-through cache rule that allows you to pull images from quay.io in order to test the ECR endpoints.
-     * With this in place, you can pull a busybox image from quay.io and it will be cached in the ECR repository using the
-     * following command:
-     *
-     * docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/quay/quay/busybox:latest
-     */
-    new CfnPullThroughCacheRule(this, "QuayPullThroughCacheRule", {
-      ecrRepositoryPrefix: "quay",
-      upstreamRegistryUrl: "quay.io"
-    });
 
     const vpc = LookupUtils.vpcLookup(this, "VpcLookup");
 

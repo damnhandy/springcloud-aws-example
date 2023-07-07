@@ -59,45 +59,5 @@ export class FoundationStack extends Stack {
       parameterName: ParamNames.KMS_ID,
       stringValue: this.kmsKey.keyId
     });
-
-    this.artifactsBucket = new s3.Bucket(this, "ArtifactsBucket", {
-      bucketName: `${this.account}-artifacts-${this.region}`,
-      encryption: s3.BucketEncryption.KMS,
-      encryptionKey: this.kmsKey,
-      enforceSSL: true,
-      objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_PREFERRED,
-      bucketKeyEnabled: true,
-      blockPublicAccess: {
-        blockPublicAcls: true,
-        blockPublicPolicy: true,
-        ignorePublicAcls: true,
-        restrictPublicBuckets: true
-      },
-      versioned: true,
-      removalPolicy: RemovalPolicy.DESTROY // this is an ill-advised policy for production apps
-    });
-
-    new StringParameter(this, "ArtifactsBucketArnParam", {
-      description: "Artifacts Bucket ARN",
-      parameterName: ParamNames.ARTIFACTS_BUCKET_ARN,
-      stringValue: this.artifactsBucket.bucketArn
-    });
-
-    new StringParameter(this, "ArtifactsBucketNameParam", {
-      description: "Artifacts Bucket Name",
-      parameterName: ParamNames.ARTIFACTS_BUCKET_NAME,
-      stringValue: this.artifactsBucket.bucketName
-    });
-
-    const appRepo = new EcrRepoWithLifecycle(this, "DemoAppImageRepo", {
-      repositoryName: "apps/demoapp",
-      withCodeBuildPolicy: false
-    });
-    this.appRepo = appRepo.repository;
-
-    new StringParameter(this, "AppRepoParam", {
-      parameterName: ParamNames.APP_ECR_REPO_NAME,
-      stringValue: this.appRepo.repositoryName
-    });
   }
 }

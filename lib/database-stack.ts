@@ -26,6 +26,7 @@ import { DBMigrationConstruct } from "./flyway-dbmigrator";
 import { LookupUtils } from "./lookup-utils";
 import { ParamNames } from "./names";
 import { randomUUID } from "crypto";
+import { Duration } from "aws-cdk-lib/core";
 export interface DatabaseStackProps extends cdk.StackProps {
   readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
@@ -103,27 +104,25 @@ export class DatabaseStack extends cdk.Stack {
       })
     });
 
-    // Disabling as VPC ENI replacement is super-sloooooow!
-    //
-    // this.dbCluster.addRotationSingleUser({
-    //   automaticallyAfter: Duration.days(1),
-    //   vpcSubnets: this.vpc.selectSubnets({
-    //     subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1", "100.65.67.1"])]
-    //   }),
-    //   excludeCharacters: " %+:;{}"
-    // });
-    // this.appUserCreds.attach(this.dbCluster);
-    //
-    // new SecretRotation(this, "PGAppUserSecretRotation", {
-    //   application: SecretRotationApplication.POSTGRES_ROTATION_SINGLE_USER,
-    //   secret: this.appUserCreds,
-    //   target: this.dbCluster,
-    //   vpc: this.vpc,
-    //   vpcSubnets: this.vpc.selectSubnets({
-    //     subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1", "100.65.67.1"])]
-    //   }),
-    //   excludeCharacters: " %+:;{}"
-    // });
+    this.dbCluster.addRotationSingleUser({
+      automaticallyAfter: Duration.days(1),
+      vpcSubnets: this.vpc.selectSubnets({
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
+      }),
+      excludeCharacters: " %+:;{}"
+    });
+    this.appUserCreds.attach(this.dbCluster);
+
+    new SecretRotation(this, "PGAppUserSecretRotation", {
+      application: SecretRotationApplication.POSTGRES_ROTATION_SINGLE_USER,
+      secret: this.appUserCreds,
+      target: this.dbCluster,
+      vpc: this.vpc,
+      vpcSubnets: this.vpc.selectSubnets({
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
+      }),
+      excludeCharacters: " %+:;{}"
+    });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
       parameterName: ParamNames.PG_SG_ID,
@@ -144,11 +143,6 @@ export class DatabaseStack extends cdk.Stack {
       parameterName: ParamNames.JDBC_PORT,
       stringValue: `${this.dbCluster.clusterEndpoint.port}`
     });
-
-    // this.dbAdminUsername = new ssm.StringParameter(this, "DBAdminUsername", {
-    //   parameterName: ParamNames.MYSQL_ADMIN_SECRET,
-    //   stringValue: dbUsername
-    // });
 
     this.dbUrl = new ssm.StringParameter(this, "JdbcUrlSSMParam", {
       parameterName: ParamNames.JDBC_URL,
