@@ -5,13 +5,13 @@ import { IVpc, Peer, Port, SecurityGroup, SubnetSelection } from "aws-cdk-lib/aw
 import { IKey } from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { DatabaseCluster } from "aws-cdk-lib/aws-rds";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
 import { Duration } from "aws-cdk-lib/core";
 import { Provider } from "aws-cdk-lib/custom-resources";
 import { Construct } from "constructs";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 /**
  *
@@ -106,6 +106,13 @@ export class DBMigrationConstruct extends Construct {
     fn.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
     fn.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
 
+    const dbMigratorLogGroup = new LogGroup(this, "DBMigratorLogGroup", {
+      encryptionKey: props.encryptionKey,
+      logGroupName: `/aws/lambda/${fn.functionName}`,
+      retention: RetentionDays.FIVE_DAYS,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
+
     const providerSg = new SecurityGroup(this, "ProviderSG", {
       vpc: props.vpc,
       allowAllOutbound: false,
@@ -121,10 +128,16 @@ export class DBMigrationConstruct extends Construct {
       vpc: props.vpc,
       vpcSubnets: props.vpcSubnets,
       providerFunctionName: "DBMigrationFunctionProvider",
-      securityGroups: [providerSg],
-      logRetention: RetentionDays.FIVE_DAYS
+      securityGroups: [providerSg]
     });
     provider.node.addDependency(props.database);
+
+    const providerLogGroup = new LogGroup(this, "ProviderLogGroup", {
+      encryptionKey: props.encryptionKey,
+      logGroupName: `/aws/lambda/DBMigrationFunctionProvider`,
+      retention: RetentionDays.FIVE_DAYS,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
 
     const cr = new CustomResource(this, `${id}DBMigrator`, {
       resourceType: "Custom::DBMigrator",
