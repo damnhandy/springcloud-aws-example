@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cp from "child_process";
-import { AppStagingSynthesizer } from "@aws-cdk/app-staging-synthesizer-alpha";
+import {
+  AppStagingSynthesizer,
+  IStagingResourcesFactory
+} from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as cdk from "aws-cdk-lib";
 import { App } from "aws-cdk-lib";
+import { PrototypeStagingStack } from "../lib/app-staging-stack";
 import { ApplicationStack } from "../lib/application-stack";
 import { DatabaseStack } from "../lib/database-stack";
 import { Ec2RdsBastionStack } from "../lib/ec2-rds-bastion-stack";
@@ -16,13 +20,16 @@ const serviceName = "demoapp";
  */
 const revision = `git-${cp.execSync("git rev-parse HEAD").toString().trim()}`;
 
-const defaultStackSynthesizer = AppStagingSynthesizer.defaultResources({
-  appId: "demoapp",
-  imageAssetVersionCount: 10
-});
-
 const app = new App({
-  //defaultStackSynthesizer: defaultStackSynthesizer
+  defaultStackSynthesizer: AppStagingSynthesizer.customFactory({
+    factory: PrototypeStagingStack.factory({
+      appId: "demoapp",
+      imageAssetVersionCount: 10,
+      maxImageAge: 30,
+      autoDeleteStagingAssets: false
+    }),
+    oncePerEnv: true
+  })
 });
 
 const env = {
@@ -49,13 +56,12 @@ const ec2Stack = new Ec2RdsBastionStack(app, "RDSBastionStack", {
   dbCluster: dbStack.dbCluster
 });
 
-// const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
-//   env: env,
-//   serviceName: serviceName,
-//   revision: revision
-// });
-// appStack.addDependency(foundationStack);
-// appStack.addDependency(dbStack);
+const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
+  env: env,
+  serviceName: serviceName,
+  revision: revision,
+  dbCluster: dbStack.dbCluster
+});
 
 app.synth({
   validateOnSynthesis: true

@@ -9,6 +9,8 @@ import { Construct } from "constructs";
 
 import { EcrRepoWithLifecycle } from "./ecr-construct";
 import { ParamNames } from "./names";
+import * as logs from "aws-cdk-lib/aws-logs";
+import { RetentionDays } from "aws-cdk-lib/aws-logs";
 
 /**
  * Test
@@ -47,7 +49,12 @@ export class FoundationStack extends Stack {
     this.kmsKey.grantEncryptDecrypt(
       new iam.ServicePrincipal(`logs.${props.env?.region}.amazonaws.com`)
     );
-
+    const appLogGroup = new logs.LogGroup(this, "DemoAppLogGroup", {
+      encryptionKey: this.kmsKey,
+      logGroupName: `/app/${props.serviceName}`,
+      retention: RetentionDays.ONE_WEEK,
+      removalPolicy: RemovalPolicy.DESTROY
+    });
     new StringParameter(this, "KmsKeyArnParam", {
       description: "DemoApp KMS Key ARN",
       parameterName: ParamNames.KMS_ARN,

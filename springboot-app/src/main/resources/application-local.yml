@@ -7,8 +7,10 @@ server:
       prefix: stdout
       suffix:
 spring:
+  application:
+    name: demoapp
   config:
-    import: "configtree:../credentials/"
+    import: "configtree:./credentials/"
   datasource:
     url: "jdbc:postgresql://localhost/demoapp"
     username: "appuser"

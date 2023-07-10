@@ -43,7 +43,8 @@ dependencies {
     implementation('org.apache.logging.log4j:log4j-web')
     implementation('com.zaxxer:HikariCP')
     implementation('org.postgresql:postgresql')
-    runtimeOnly('io.micrometer:micrometer-registry-prometheus')
+    // https://docs.awspring.io/spring-cloud-aws/docs/3.0.0-SNAPSHOT/reference/html/index.html#cloudwatch-metrics
+    runtimeOnly('io.micrometer:micrometer-registry-cloudwatch2')
     testImplementation('com.h2database:h2')
     testImplementation('org.springframework.boot:spring-boot-starter-test')
 }

@@ -21,6 +21,9 @@
         <Logger name="com.example.awscloud.config" level="debug" additivity="false">
             <AppenderRef ref="Console" />
         </Logger>
+        <Logger name="org.postgresql" level="debug" additivity="false">
+            <AppenderRef ref="Console" />
+        </Logger>
     </Loggers>
 
 </Configuration>

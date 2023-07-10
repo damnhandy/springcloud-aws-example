@@ -1,10 +1,3 @@
-aws:
-  paramstore:
-    enabled: true
-  secretsmanager:
-    enabled: true
-    default-context: "shared"
-    name: "${spring.application.name}"
 server:
   undertow:
     accesslog:
@@ -15,27 +8,37 @@ server:
       suffix:
   # ensures that you'll get the x-forwarded headers form the ALB
   forward-headers-strategy: native
+
 spring:
   application:
     name: demoapp
   config:
+    # https://docs.awspring.io/spring-cloud-aws/docs/3.0.0-SNAPSHOT/reference/html/index.html#adding-prefix-to-property-keys
     import:
-      - "aws-secretsmanager:/secret/${spring.application.name}/appuser?postgres"
+      - aws-secretsmanager:/secret/${spring.application.name}/appuser?prefix=appuser.
+  cloud:
+    aws:
+      secretsmanager:
+        reload:
+          strategy: restart_context
   datasource:
-    url: "jdbc:postgresql://${postgres.host}:${postgres.port}/demoapp"
-    username: "${postgres.username}"
-    password: "${postgres.password}"
+    url: "jdbc:postgresql://${appuser.host}:${appuser.port}/${appuser.dbname}"
+    username: "${appuser.username}"
+    password: "${appuser.password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
         currentSchema: demoapp
         ssl: true
         sslmode: verify-ca
+      connection-timeout: 5
 
 management:
   server:
     port: 8081
   endpoint:
+    restart:
+      enabled: true
     health:
       probes:
         enabled: true
@@ -44,3 +47,7 @@ management:
     logfile:
       enabled: true
       external-file: /var/log/demoapp/access_log_management
+  endpoints:
+    web:
+      exposure:
+        include: restart

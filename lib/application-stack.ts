@@ -1,25 +1,28 @@
 import * as path from "path";
 import { RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
-import { IVpc, Port } from "aws-cdk-lib/aws-ec2";
+import { IVpc, Peer, Port, SecurityGroup, SubnetFilter } from "aws-cdk-lib/aws-ec2";
 import { IRepository } from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
-import { LogDriver } from "aws-cdk-lib/aws-ecs";
-import { ApplicationLoadBalancedFargateService } from "aws-cdk-lib/aws-ecs-patterns";
+import { FargateTaskDefinition, LogDriver } from "aws-cdk-lib/aws-ecs";
 import {
+  ApplicationLoadBalancer,
   ApplicationProtocol,
   ApplicationProtocolVersion,
+  IpAddressType,
   Protocol
 } from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import { IKey, Key } from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
-import { RetentionDays } from "aws-cdk-lib/aws-logs";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 
 import { Secret } from "aws-cdk-lib/aws-secretsmanager";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 
+import { Duration } from "aws-cdk-lib/core";
 import { Construct } from "constructs";
 import { LookupUtils } from "./lookup-utils";
 import { ParamNames } from "./names";
+import { IDatabaseCluster } from "aws-cdk-lib/aws-rds";
 
 /**
  *
@@ -27,6 +30,7 @@ import { ParamNames } from "./names";
 export interface ApplicationStackProps extends StackProps {
   readonly serviceName: string;
   readonly revision: string;
+  readonly dbCluster: IDatabaseCluster;
 }
 
 /**
@@ -58,58 +62,96 @@ export class ApplicationStack extends Stack {
       containerInsights: true
     });
 
-    const logGroup = new logs.LogGroup(this, "LogGroup", {
-      encryptionKey: this.kmsKey,
-      retention: RetentionDays.ONE_WEEK,
-      removalPolicy: RemovalPolicy.DESTROY
+    const logGroup = LogGroup.fromLogGroupName(this, "LogGroup", `/app/${props.serviceName}`);
+
+    const taskDefinition = new FargateTaskDefinition(this, "DemoAppTaskDef", {
+      memoryLimitMiB: 2048,
+      cpu: 1024
     });
 
-    // Create a load-balanced Fargate service and make it public
-    const ecsService = new ApplicationLoadBalancedFargateService(this, "DemoApplication", {
-      serviceName: props.serviceName,
-      loadBalancerName: `${props.serviceName}-loadbalancer`,
+    const container = taskDefinition.addContainer("DemoAppContainer", {
+      containerName: `${props.serviceName}-container`,
+      image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app"), {
+        assetName: "springboot-app"
+      }),
+      logging: LogDriver.awsLogs({
+        logGroup,
+        streamPrefix: `${props.serviceName}`
+      }),
+      environment: {
+        SPRING_PROFILES_ACTIVE: "aws",
+        JAVA_TOOL_OPTIONS:
+          "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
+      }
+    });
+    container.addPortMappings({
+      containerPort: 8080,
+      protocol: ecs.Protocol.TCP
+    });
+
+    const ecsSecurityGroup = new SecurityGroup(this, "DemoAppSecurityGroup", {
+      vpc: this.vpc,
+      allowAllOutbound: false,
+      disableInlineRules: true
+    });
+    ecsSecurityGroup.connections.allowTo(props.dbCluster, Port.tcp(5432));
+    ecsSecurityGroup.connections.allowTo(Peer.ipv4("10.105.112.0/21"), Port.tcp(443));
+    ecsSecurityGroup.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
+    ecsSecurityGroup.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
+
+    const service = new ecs.FargateService(this, "DemoAppService", {
+      assignPublicIp: false,
       cluster,
-      cpu: 512,
+      taskDefinition,
       desiredCount: 1,
-      taskImageOptions: {
-        containerName: `${props.serviceName}-container`,
-        enableLogging: true,
-        logDriver: LogDriver.awsLogs({
-          logGroup,
-          streamPrefix: `${props.serviceName}`
-        }),
-        image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app"), {
-          assetName: "springboot-app"
-        }),
-        containerPort: 8080,
-        environment: {
-          SPRING_PROFILES_ACTIVE: "aws",
-          JAVA_TOOL_OPTIONS:
-            "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
-        }
-      },
+      securityGroups: [ecsSecurityGroup],
+      vpcSubnets: this.vpc.selectSubnets({
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.100", "100.64.16.100"])]
+      })
+    });
+
+    const alb = new ApplicationLoadBalancer(this, "DemoAppAlb", {
+      vpc: this.vpc,
+      ipAddressType: IpAddressType.IPV4,
+      internetFacing: false,
+      vpcSubnets: this.vpc.selectSubnets({
+        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.100", "100.64.16.100"])]
+      })
+    });
+    service.connections.allowFrom(alb, Port.tcp(8080));
+
+    const listener = alb.addListener("DemoAppAlbListener", {
+      open: true,
+      protocol: ApplicationProtocol.HTTP
+    });
+
+    listener.addTargets("DemoAppTargetGroup", {
       protocol: ApplicationProtocol.HTTP,
       protocolVersion: ApplicationProtocolVersion.HTTP1,
-      memoryLimitMiB: 1024,
-      publicLoadBalancer: true,
-      listenerPort: 80
+      targets: [
+        service.loadBalancerTarget({
+          containerName: container.containerName,
+          containerPort: container.containerPort,
+          protocol: ecs.Protocol.TCP
+        })
+      ],
+      healthCheck: {
+        interval: Duration.seconds(60),
+        timeout: Duration.seconds(5),
+        path: "/actuator/health/liveness",
+        protocol: Protocol.HTTP,
+        port: "8081",
+        healthyHttpCodes: "200"
+      }
     });
-    ecsService.taskDefinition.defaultContainer?.addPortMappings({
+
+    service.taskDefinition.defaultContainer?.addPortMappings({
       containerPort: 8081
     });
-    ecsService.targetGroup.configureHealthCheck({
-      path: "/actuator/health/liveness",
-      port: "8081",
-      protocol: Protocol.HTTP,
-      healthyHttpCodes: "200"
-    });
-    ecsService.loadBalancer.connections.allowTo(
-      ecsService.service,
-      Port.tcp(8081),
-      "ALB Health Check"
-    );
-    appUserCredentials.grantRead(ecsService.taskDefinition.taskRole);
 
-    this.kmsKey.grantDecrypt(ecsService.service.taskDefinition.taskRole);
+    alb.connections.allowTo(service, Port.tcp(8081), "ALB Health Check");
+    appUserCredentials.grantRead(service.taskDefinition.taskRole);
+
+    this.kmsKey.grantDecrypt(service.taskDefinition.taskRole);
   }
 }
