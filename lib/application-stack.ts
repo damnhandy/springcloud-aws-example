@@ -80,12 +80,21 @@ export class ApplicationStack extends Stack {
       }),
       environment: {
         SPRING_PROFILES_ACTIVE: "aws",
-        JAVA_TOOL_OPTIONS:
-          "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
+        JAVA_TOOL_OPTIONS: `-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8`
       }
     });
+    /**
+     * Expose the default HTTP endpoint for access through the ALB
+     */
     container.addPortMappings({
       containerPort: 8080,
+      protocol: ecs.Protocol.TCP
+    });
+    /**
+     * Expose the actuator endpoints on 8081 which are accessible through the ALB
+     */
+    container.addPortMappings({
+      containerPort: 8081,
       protocol: ecs.Protocol.TCP
     });
 
@@ -118,7 +127,14 @@ export class ApplicationStack extends Stack {
         subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.100", "100.64.16.100"])]
       })
     });
+    /**
+     * Primary HTTP port
+     */
     service.connections.allowFrom(alb, Port.tcp(8080));
+    /**
+     * Health check endpoint
+     */
+    service.connections.allowFrom(alb, Port.tcp(8081));
 
     const listener = alb.addListener("DemoAppAlbListener", {
       open: true,

@@ -79,4 +79,4 @@ ENV LANG=en_US.UTF-8 \
   JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8" \
   PATH=/usr/local/jre/bin:${PATH}
 USER appuser:appuser
-ENTRYPOINT [ "java","-jar","/opt/app/springboot-app.jar","-Djavax.net.ssl.trustStore=/opt/app/jdbc_truststore_aws.p12"]
+ENTRYPOINT [ "java","-jar","/opt/app/springboot-app.jar"]
