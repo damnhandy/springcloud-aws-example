@@ -22,7 +22,7 @@ spring:
         reload:
           strategy: restart_context
   datasource:
-    url: "jdbc:postgresql://localhost:${appuser.port}/${appuser.dbname}"
+    url: "jdbc:postgresql://${appuser.host}:${appuser.port}/${appuser.dbname}"
     username: "${appuser.username}"
     password: "${appuser.password}"
     hikari:
