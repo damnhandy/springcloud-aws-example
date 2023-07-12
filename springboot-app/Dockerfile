@@ -48,11 +48,9 @@ WORKDIR /opt/project
 RUN ./gradlew clean build -x test --no-daemon --stacktrace
 
 # Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
-RUN curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o us-east-1-bundle.pem
-RUN keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
+RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o global-bundle.pem
+RUN keytool -importcert -alias AWS-RDS-Global -file global-bundle.pem -keystore \
   ${TMP_ROOT}/usr/local/${JVM_VERSION}-jre/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
-
-COPY truststores/jdbc_truststore_aws.p12 /opt/project/jdbc_truststore_aws.p12
 
 RUN groupadd -r appuser --root ${TMP_ROOT}
 RUN useradd -r appuser -G appuser --root ${TMP_ROOT}
@@ -66,7 +64,6 @@ RUN find "${TMP_ROOT}/tmp" -mindepth 1 -delete
 FROM scratch
 COPY --from=builder /chroot/app /
 COPY --from=builder --chown=appuser:appuser /opt/project/build/libs/springboot-app-1.0.0.jar /opt/app/springboot-app.jar
-COPY --from=builder --chown=appuser:appuser /opt/project/jdbc_truststore_aws.p12 /opt/app/jdbc_truststore_aws.p12
 # Creating symlinks to /dev/stdout so that all logs are sent to the containers logstream.
 RUN mkdir -p /var/log/demoapp \
   && ln -s /dev/stdout /var/log/demoapp/access_log \

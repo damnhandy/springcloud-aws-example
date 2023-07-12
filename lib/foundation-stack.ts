@@ -7,7 +7,6 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import { StringParameter } from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 
-import { EcrRepoWithLifecycle } from "./ecr-construct";
 import { ParamNames } from "./names";
 import * as logs from "aws-cdk-lib/aws-logs";
 import { RetentionDays } from "aws-cdk-lib/aws-logs";

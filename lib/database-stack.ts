@@ -69,6 +69,7 @@ export class DatabaseStack extends cdk.Stack {
     });
     Tags.of(this.appUserCreds).add("gs:Test", "Appuser");
 
+    // @ts-ignore
     const parameterGroup = new ParameterGroup(this, "DBParameterGroup", {
       engine: DatabaseClusterEngine.auroraPostgres({
         version: AuroraPostgresEngineVersion.VER_15_2
@@ -76,7 +77,13 @@ export class DatabaseStack extends cdk.Stack {
       parameters: {
         ssl: "1",
         // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-        ssl_min_protocol_version: "TLSv1.2"
+        ssl_min_protocol_version: "TLSv1.2",
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+        // Use this for Aurora MySQL
+        //require_secure_transport: "ON",
+        // Use this for Aurora Postgres
+        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+        "rds.force_ssl": "1"
       }
     });
 
