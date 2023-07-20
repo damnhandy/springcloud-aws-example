@@ -1,6 +1,5 @@
 import { Stack } from "aws-cdk-lib";
 import { Match, Template } from "aws-cdk-lib/assertions";
-import { EcrRepoWithLifecycle } from "../lib/ecr-construct";
 
 test("create ecr repo without codebuild permissions", () => {
   const stack = new Stack();

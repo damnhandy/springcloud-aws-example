@@ -19,6 +19,7 @@ coverage/**
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 springboot-app/bin
+flyway-lambda/bin
 ### IntelliJ IDEA ###
 .idea
 *.iws
@@ -51,3 +52,4 @@ cdk.context.json
 .cdk.staging
 credentials/
 .nix-node
+*/.aws-sam/

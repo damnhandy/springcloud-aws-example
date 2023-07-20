@@ -17,7 +17,13 @@ import {
 } from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
-import { ISecret, SecretRotation, SecretRotationApplication } from "aws-cdk-lib/aws-secretsmanager";
+import {
+  HostedRotation,
+  ISecret,
+  RotationSchedule,
+  SecretRotation,
+  SecretRotationApplication
+} from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { IStringParameter, StringParameter } from "aws-cdk-lib/aws-ssm";
 
@@ -99,9 +105,11 @@ export class DatabaseStack extends cdk.Stack {
       writer: ClusterInstance.provisioned("WriterNode", {
         instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MEDIUM)
       }),
+      serverlessV2MaxCapacity: 2,
+      serverlessV2MinCapacity: 1,
       readers: [
-        ClusterInstance.provisioned("ReaderNode1", {
-          instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MEDIUM)
+        ClusterInstance.serverlessV2("ReaderNode1", {
+          scaleWithWriter: true
         })
       ],
       deletionProtection: false,
@@ -129,6 +137,21 @@ export class DatabaseStack extends cdk.Stack {
         subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
       }),
       excludeCharacters: " %+:;{}"
+    });
+
+    const rotationSchedule = new RotationSchedule(this, "PGAppUserRotationSchedule", {
+      secret: this.appUserCreds,
+      // the properties below are optional
+      automaticallyAfter: cdk.Duration.days(1),
+      hostedRotation: HostedRotation.postgreSqlSingleUser({
+        functionName: "AppUserRotation",
+        vpc: this.vpc,
+        vpcSubnets: this.vpc.selectSubnets({
+          subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
+        }),
+        excludeCharacters: " %+:;{}"
+      }),
+      rotateImmediatelyOnUpdate: true
     });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
