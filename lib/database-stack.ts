@@ -102,11 +102,9 @@ export class DatabaseStack extends cdk.Stack {
       engine: DatabaseClusterEngine.auroraPostgres({
         version: AuroraPostgresEngineVersion.VER_15_2
       }),
-      writer: ClusterInstance.provisioned("WriterNode", {
-        instanceType: ec2.InstanceType.of(ec2.InstanceClass.BURSTABLE3, ec2.InstanceSize.MEDIUM)
-      }),
+      writer: ClusterInstance.serverlessV2("WriterNode"),
       serverlessV2MaxCapacity: 2,
-      serverlessV2MinCapacity: 1,
+      serverlessV2MinCapacity: 0.5,
       readers: [
         ClusterInstance.serverlessV2("ReaderNode1", {
           scaleWithWriter: true
