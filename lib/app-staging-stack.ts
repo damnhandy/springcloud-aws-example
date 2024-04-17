@@ -238,7 +238,11 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
 
   private readonly deployRoleArn?: string;
 
-  constructor(scope: App, id: string, private readonly props: PrototypeStagingStackProps) {
+  constructor(
+    scope: App,
+    id: string,
+    private readonly props: PrototypeStagingStackProps
+  ) {
     super(scope, id, {
       ...props,
       synthesizer: new BootstraplessSynthesizer(),
@@ -360,14 +364,8 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     // Create the bucket once the dependencies have been created
     const bucket = new s3.Bucket(this, bucketId, {
       bucketName: stagingBucketName,
-      ...(this.autoDeleteStagingAssets
-        ? {
-            removalPolicy: RemovalPolicy.DESTROY,
-            autoDeleteObjects: true
-          }
-        : {
-            removalPolicy: RemovalPolicy.RETAIN
-          }),
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: false,
       encryption: s3.BucketEncryption.KMS,
       encryptionKey: key,
 

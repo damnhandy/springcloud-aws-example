@@ -7,6 +7,7 @@ import { IVpc, SubnetFilter } from "aws-cdk-lib/aws-ec2";
 import { IKey, Key } from "aws-cdk-lib/aws-kms";
 import {
   AuroraPostgresEngineVersion,
+  CaCertificate,
   ClusterInstance,
   Credentials,
   DatabaseCluster,
@@ -117,40 +118,29 @@ export class DatabaseStack extends cdk.Stack {
       })
     });
 
-    this.dbCluster.addRotationSingleUser({
-      automaticallyAfter: Duration.days(1),
-      vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-      }),
-      excludeCharacters: " %+:;{}"
-    });
-    this.appUserCreds.attach(this.dbCluster);
+    // this.dbCluster.addRotationSingleUser({
+    //   automaticallyAfter: Duration.days(1),
+    //   vpcSubnets: this.vpc.selectSubnets({
+    //     subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
+    //   }),
+    //   excludeCharacters: " %+:;{}"
+    // });
+    // this.appUserCreds.attach(this.dbCluster);
 
-    new SecretRotation(this, "PGAppUserSecretRotation", {
-      application: SecretRotationApplication.POSTGRES_ROTATION_SINGLE_USER,
-      secret: this.appUserCreds,
-      target: this.dbCluster,
-      vpc: this.vpc,
-      vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-      }),
-      excludeCharacters: " %+:;{}"
-    });
-
-    const rotationSchedule = new RotationSchedule(this, "PGAppUserRotationSchedule", {
-      secret: this.appUserCreds,
-      // the properties below are optional
-      automaticallyAfter: cdk.Duration.days(1),
-      hostedRotation: HostedRotation.postgreSqlSingleUser({
-        functionName: "AppUserRotation",
-        vpc: this.vpc,
-        vpcSubnets: this.vpc.selectSubnets({
-          subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-        }),
-        excludeCharacters: " %+:;{}"
-      }),
-      rotateImmediatelyOnUpdate: true
-    });
+    // const rotationSchedule = new RotationSchedule(this, "PGAppUserRotationSchedule", {
+    //   secret: this.appUserCreds,
+    //   // the properties below are optional
+    //   automaticallyAfter: cdk.Duration.days(30),
+    //   hostedRotation: HostedRotation.postgreSqlSingleUser({
+    //     functionName: "AppUserRotation",
+    //     vpc: this.vpc,
+    //     vpcSubnets: this.vpc.selectSubnets({
+    //       subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
+    //     }),
+    //     excludeCharacters: " %+:;{}"
+    //   }),
+    //   rotateImmediatelyOnUpdate: false
+    // });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
       parameterName: ParamNames.PG_SG_ID,
