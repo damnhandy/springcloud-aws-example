@@ -59,7 +59,7 @@ dependencies {
     testImplementation('org.mockito:mockito-junit-jupiter:5.4.0')
     testImplementation("me.madhead.aws-junit5:s3-v2:7.1.2")
     testImplementation("me.madhead.aws-junit5:lambda-v2:7.1.2")
-    testImplementation('org.zapodot:embedded-db-junit-jupiter:2.1.0')
+    testImplementation('org.zapodot:embedded-db-junit-jupiter:2.1.1')
     testRuntimeOnly ('org.junit.jupiter:junit-jupiter-engine')
 }
 
