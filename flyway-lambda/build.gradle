@@ -48,7 +48,7 @@ dependencies {
     aspect("software.amazon.lambda:powertools-metrics:${powertoolsVersion}")
     aspect("software.amazon.lambda:powertools-tracing:${powertoolsVersion}")
     implementation("software.amazon.lambda:powertools-serialization:${powertoolsVersion}")
-    implementation 'org.aspectj:aspectjrt:1.9.19'
+    implementation 'org.aspectj:aspectjrt:1.9.22'
     implementation 'org.apache.logging.log4j:log4j-api:2.20.0'
     implementation 'org.apache.logging.log4j:log4j-core:2.20.0'
     implementation('com.fasterxml.jackson.datatype:jackson-datatype-jsr310')
