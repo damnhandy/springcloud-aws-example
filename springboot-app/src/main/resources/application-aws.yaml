@@ -12,29 +12,17 @@ server:
 spring:
   application:
     name: demoapp
-  config:
-    # https://docs.awspring.io/spring-cloud-aws/docs/3.0.0-SNAPSHOT/reference/html/index.html#adding-prefix-to-property-keys
-    import:
-      - aws-secretsmanager:/secret/${spring.application.name}/appuser?prefix=appuser.
-  cloud:
-    aws:
-      secretsmanager:
-        reload:
-          strategy: restart_context
   datasource:
-    url: "jdbc:postgresql://${appuser.host}:${appuser.port}/${appuser.dbname}"
-    username: "${appuser.username}"
-    password: "${appuser.password}"
+    url: "jdbc:postgresql://${demoapp.db.host}:${demoapp.db.port}/${demoapp.db.name}"
+    username: "${demoapp.db.username}"
+    password: "${demoapp.db.password}"
     hikari:
       maximum-pool-size: 20
       data-source-properties:
         currentSchema: demoapp
         ssl: true
         sslmode: verify-ca
-        # Since we are loading the RDS certs into the keystore, we must provide this
-        # sslfactory impl in order for it work. Otherwise, PG will look at the file system
-        # for specific certs located in specific locations.
-        sslfactory: "org.postgresql.ssl.DefaultJavaSSLFactory"
+        sslrootcert: /opt/app/global-bundle.pem
 
 management:
   server:

@@ -32,9 +32,9 @@ if [[ -f "./credentials/jdbc_truststore_aws.p12" ]]; then
 fi
 
 # https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/UsingWithRDS.SSL.html
-curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o ./credentials/us-east-1-bundle.pem
+curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem  -o ./credentials/global-bundle.pem
 
-keytool -importcert -alias rds-root -file ./credentials/us-east-1-bundle.pem -keystore \
+keytool -importcert -alias rds-root -file ./credentials/global-bundle.pem -keystore \
   ./credentials/jdbc_truststore_aws.p12 -storetype pkcs12 -noprompt -storepass "changeit"
 
 if [[ ! -d "./springboot-app/truststores" ]]; then

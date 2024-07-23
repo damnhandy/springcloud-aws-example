@@ -1,31 +1,32 @@
 import * as cp from "child_process";
 import * as path from "path";
-import { BundlingOutput, CustomResource, RemovalPolicy, Size, StageProps } from "aws-cdk-lib";
-import { IVpc, Peer, Port, SecurityGroup, SubnetSelection } from "aws-cdk-lib/aws-ec2";
-import { IKey } from "aws-cdk-lib/aws-kms";
+import * as cdk from "aws-cdk-lib";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as kms from "aws-cdk-lib/aws-kms";
 import * as lambda from "aws-cdk-lib/aws-lambda";
-import { Code, Runtime, Tracing } from "aws-cdk-lib/aws-lambda";
-import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
-import { DatabaseCluster } from "aws-cdk-lib/aws-rds";
+import * as logs from "aws-cdk-lib/aws-logs";
+import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
-import { ISecret } from "aws-cdk-lib/aws-secretsmanager";
-import { Duration } from "aws-cdk-lib/core";
-import { Provider } from "aws-cdk-lib/custom-resources";
+import * as sm from "aws-cdk-lib/aws-secretsmanager";
+import * as ssm from "aws-cdk-lib/aws-ssm";
+
 import { Construct } from "constructs";
+import { ParamNames } from "./names";
 
 /**
  *
  */
-export interface DBMigrationConstructProps extends StageProps {
-  readonly vpc: IVpc;
-  readonly vpcSubnets: SubnetSelection;
-  readonly encryptionKey: IKey;
+export interface DBMigrationConstructProps extends cdk.StageProps {
+  readonly vpc: ec2.IVpc;
+  readonly vpcSubnets: ec2.SubnetSelection;
+  readonly encryptionKey: kms.IKey;
   readonly locations: s3assets.Asset;
-  readonly database: DatabaseCluster;
-  readonly masterPassword: ISecret;
-  readonly ephemeralStorageSize?: Size;
-  readonly placeholders: { [key: string]: string };
-  readonly secretPlaceHolders?: { [key: string]: ISecret };
+  readonly database: rds.DatabaseCluster;
+  readonly masterPassword: sm.ISecret;
+  readonly ephemeralStorageSize?: cdk.Size;
+  readonly placeholders?: { [key: string]: string };
+  readonly secretPlaceHolders?: { [key: string]: sm.ISecret };
+  readonly logGroup: logs.ILogGroup;
 }
 
 /**
@@ -37,19 +38,25 @@ export class DBMigrationConstruct extends Construct {
   constructor(scope: Construct, id: string, props: DBMigrationConstructProps) {
     super(scope, id);
 
+    const securityGroup = new ec2.SecurityGroup(this, `${id}DBMigratorSecurityGroup`, {
+      vpc: props.vpc,
+      allowAllOutbound: false,
+      allowAllIpv6Outbound: false
+    });
+    cdk.Tags.of(securityGroup).add("Name", `${id}DBMigratorSecurityGroup`);
+
     const functionDir = path.resolve(__dirname, "../flyway-lambda");
     const fn = new lambda.SingletonFunction(this, `${id}DBMigratorFunction`, {
-      functionName: "DBMigratorLambda",
       description: "Custom resource function to deploy schema migrations using Flyway",
-      code: Code.fromAsset(functionDir, {
+      code: lambda.Code.fromAsset(functionDir, {
         bundling: {
-          image: Runtime.JAVA_17.bundlingImage,
+          image: lambda.Runtime.JAVA_17.bundlingImage,
           command: [
             "/bin/sh",
             "-c",
             "./gradlew build --no-daemon && cp /asset-input/build/distributions/flyway-lambda.zip /asset-output/"
           ],
-          outputType: BundlingOutput.ARCHIVED,
+          outputType: cdk.BundlingOutput.ARCHIVED,
           local: {
             tryBundle(outputDir: string) {
               try {
@@ -67,34 +74,56 @@ export class DBMigrationConstruct extends Construct {
           }
         }
       }),
-      tracing: Tracing.ACTIVE,
+      tracing: lambda.Tracing.ACTIVE,
+      logGroup: props.logGroup,
+      loggingFormat: lambda.LoggingFormat.JSON,
+      applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
+      systemLogLevelV2: lambda.SystemLogLevel.INFO,
       handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
-      runtime: Runtime.JAVA_17,
-      ephemeralStorageSize: props.ephemeralStorageSize || Size.mebibytes(512),
+      runtime: lambda.Runtime.JAVA_17,
+      ephemeralStorageSize: props.ephemeralStorageSize || cdk.Size.mebibytes(512),
       uuid: "CC2B87AC-AA48-4B81-B4E3-FE9C4AE28A2F",
       vpc: props.vpc,
       vpcSubnets: props.vpcSubnets,
       environmentEncryption: props.encryptionKey,
       memorySize: 512,
-      timeout: Duration.minutes(10),
+      timeout: cdk.Duration.minutes(10),
       paramsAndSecrets: lambda.ParamsAndSecretsLayerVersion.fromVersion(
         lambda.ParamsAndSecretsVersions.V1_0_103,
         {
           cacheEnabled: true,
           cacheSize: 500,
-          logLevel: lambda.ParamsAndSecretsLogLevel.DEBUG
+          logLevel: lambda.ParamsAndSecretsLogLevel.WARN
         }
       ),
       allowAllOutbound: false,
       environment: {
         POWERTOOLS_LOG_LEVEL: "INFO",
-        POWERTOOLS_SERVICE_NAME: "DBMigrator"
+        POWERTOOLS_SERVICE_NAME: "DBMigrator",
+        LOG_LEVEL: "DEBUG",
+        JAVA_TOOL_OPTIONS: "-Djava.net.preferIPv4Stack=true"
       }
     });
-    props.encryptionKey.grantDecrypt(fn);
+
+    const assetsKey = kms.Key.fromKeyArn(
+      this,
+      "AssetsKey",
+      "arn:aws:kms:us-east-1:226350727888:key/523fea9a-b4b0-4dc1-9519-d989b14cbc73"
+    );
+
+    assetsKey.grantDecrypt(fn);
+    props.encryptionKey.grantEncryptDecrypt(fn);
     props.masterPassword.grantRead(fn);
     props.locations.grantRead(fn);
-    props.database.connections.allowDefaultPortFrom(fn);
+
+    const endpointSecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
+      this,
+      "EndpointSecurityGroup",
+      ssm.StringParameter.valueForStringParameter(this, ParamNames.ENDPOINT_SG_ID)
+    );
+    fn.connections.allowTo(ec2.Peer.prefixList("pl-63a5400a"), ec2.Port.tcp(443));
+    fn.connections.allowTo(endpointSecurityGroup, ec2.Port.tcp(443));
+    fn.connections.allowTo(props.database, ec2.Port.tcp(props.database.clusterEndpoint.port));
     if (props.secretPlaceHolders) {
       this.resolvedSecretPlaceHolders = {};
       for (const k in props.secretPlaceHolders) {
@@ -102,47 +131,10 @@ export class DBMigrationConstruct extends Construct {
         this.resolvedSecretPlaceHolders[k] = props.secretPlaceHolders[k].secretName;
       }
     }
-    fn.connections.allowTo(Peer.ipv4("10.105.112.0/21"), Port.tcp(443));
-    fn.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
-    fn.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
-
-    const dbMigratorLogGroup = new LogGroup(this, "DBMigratorLogGroup", {
-      encryptionKey: props.encryptionKey,
-      logGroupName: `/aws/lambda/${fn.functionName}`,
-      retention: RetentionDays.FIVE_DAYS,
-      removalPolicy: RemovalPolicy.DESTROY
-    });
-
-    const providerSg = new SecurityGroup(this, "ProviderSG", {
-      vpc: props.vpc,
-      allowAllOutbound: false,
-      disableInlineRules: true
-    });
-
-    providerSg.connections.allowTo(Peer.ipv4("10.105.112.0/21"), Port.tcp(443));
-    providerSg.connections.allowTo(Peer.ipv4("100.64.0.0/19"), Port.tcp(443));
-    providerSg.connections.allowTo(Peer.prefixList("pl-63a5400a"), Port.tcp(443));
-
-    const provider = new Provider(this, `${id}Provider`, {
-      onEventHandler: fn,
-      vpc: props.vpc,
-      vpcSubnets: props.vpcSubnets,
-      providerFunctionName: "DBMigrationFunctionProvider",
-      securityGroups: [providerSg]
-    });
-    provider.node.addDependency(props.database);
-
-    const providerLogGroup = new LogGroup(this, "ProviderLogGroup", {
-      encryptionKey: props.encryptionKey,
-      logGroupName: `/aws/lambda/DBMigrationFunctionProvider`,
-      retention: RetentionDays.FIVE_DAYS,
-      removalPolicy: RemovalPolicy.DESTROY
-    });
-
-    const cr = new CustomResource(this, `${id}DBMigrator`, {
+    const cr = new cdk.CustomResource(this, `${id}DBMigrator`, {
       resourceType: "Custom::DBMigrator",
-      serviceToken: provider.serviceToken,
-      removalPolicy: RemovalPolicy.DESTROY,
+      serviceToken: fn.functionArn,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       properties: {
         masterSecret: props.masterPassword.secretName,
         locations: props.locations.s3ObjectUrl,

@@ -1,52 +1,29 @@
-import * as path from "path";
 import * as cdk from "aws-cdk-lib";
-
-import { Tags } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import { IVpc, SubnetFilter } from "aws-cdk-lib/aws-ec2";
-import { IKey, Key } from "aws-cdk-lib/aws-kms";
-import {
-  AuroraPostgresEngineVersion,
-  ClusterInstance,
-  Credentials,
-  DatabaseCluster,
-  DatabaseClusterEngine,
-  DatabaseSecret,
-  IDatabaseCluster,
-  ParameterGroup
-} from "aws-cdk-lib/aws-rds";
+import * as kms from "aws-cdk-lib/aws-kms";
+import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import * as s3assets from "aws-cdk-lib/aws-s3-assets";
-import {
-  HostedRotation,
-  ISecret,
-  RotationSchedule,
-  SecretRotation,
-  SecretRotationApplication
-} from "aws-cdk-lib/aws-secretsmanager";
+import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
-import { IStringParameter, StringParameter } from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { DBMigrationConstruct } from "./flyway-dbmigrator";
-import { LookupUtils } from "./lookup-utils";
 import { ParamNames } from "./names";
-import { randomUUID } from "crypto";
-import { Duration } from "aws-cdk-lib/core";
 export interface DatabaseStackProps extends cdk.StackProps {
+  readonly vpc: ec2.IVpc;
   readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
   readonly revision: string;
+  readonly endpointSecurityGroup: ec2.ISecurityGroup;
 }
 
 export class DatabaseStack extends cdk.Stack {
-  public dbCluster: DatabaseCluster;
-  public dbUrl: IStringParameter;
-  public dbAdminCreds: ISecret;
-  public appUserCreds: ISecret;
-  kmsKey: IKey;
+  public dbCluster: rds.DatabaseCluster;
+  public dbUrl: ssm.IStringParameter;
+  public dbAdminCreds: secretsmanager.ISecret;
+  public appUserCreds: secretsmanager.ISecret;
+  kmsKey: kms.IKey;
   artifactsBucket: s3.IBucket;
-  vpc: IVpc;
+  vpc: ec2.IVpc;
 
   constructor(scope: Construct, id: string, props: DatabaseStackProps) {
     super(scope, id, props);
@@ -55,102 +32,98 @@ export class DatabaseStack extends cdk.Stack {
     }
     this.artifactsBucket = props.artifactsBucket;
 
-    this.vpc = LookupUtils.vpcLookup(this, "VpcLookup");
-    this.kmsKey = Key.fromKeyArn(
+    this.vpc = props.vpc;
+    this.kmsKey = kms.Key.fromKeyArn(
       this,
       "KmsKeyRef",
-      StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
+      ssm.StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
     );
 
-    this.dbAdminCreds = new DatabaseSecret(this, "AdminCreds", {
+    this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
       secretName: ParamNames.PG_ADMIN_SECRET,
-      username: "postgres",
+      username: "dbadmin",
       encryptionKey: this.kmsKey
     });
 
-    this.appUserCreds = new DatabaseSecret(this, "AppuserAdminCreds", {
+    this.appUserCreds = new rds.DatabaseSecret(this, "AppuserCreds", {
       secretName: ParamNames.DEMO_APP_USER_SECRET,
       username: "appuser",
       encryptionKey: this.kmsKey
     });
-    Tags.of(this.appUserCreds).add("gs:Test", "Appuser");
 
-    // @ts-ignore
-    const parameterGroup = new ParameterGroup(this, "DBParameterGroup", {
-      engine: DatabaseClusterEngine.auroraPostgres({
-        version: AuroraPostgresEngineVersion.VER_15_2
+    const parameterGroup = new rds.ParameterGroup(this, "DBParameterGroup", {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_2
       }),
       parameters: {
         ssl: "1",
         // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         ssl_min_protocol_version: "TLSv1.2",
         // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-        // Use this for Aurora MySQL
-        //require_secure_transport: "ON",
-        // Use this for Aurora Postgres
         // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         "rds.force_ssl": "1"
       }
     });
 
-    this.dbCluster = new DatabaseCluster(this, "DBCluster", {
+    const securityGroup = new ec2.SecurityGroup(this, "DBSecurityGroup", {
+      vpc: props.vpc,
+      allowAllOutbound: false,
+      description: "Security group for Aurora Postgres",
+      disableInlineRules: true,
+      allowAllIpv6Outbound: false
+    });
+
+    this.dbCluster = new rds.DatabaseCluster(this, "DBCluster", {
+      networkType: rds.NetworkType.DUAL,
       defaultDatabaseName: props.serviceName,
-      clusterIdentifier: `${props.serviceName}-cluster`,
       parameterGroup: parameterGroup,
-      credentials: Credentials.fromSecret(this.dbAdminCreds),
+      cloudwatchLogsExports: ["postgresql"],
+      enableDataApi: true,
+      credentials: rds.Credentials.fromSecret(this.dbAdminCreds),
       storageEncryptionKey: this.kmsKey,
-      engine: DatabaseClusterEngine.auroraPostgres({
-        version: AuroraPostgresEngineVersion.VER_15_2
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_2
       }),
-      writer: ClusterInstance.serverlessV2("WriterNode"),
+      writer: rds.ClusterInstance.serverlessV2("WriterNode"),
       serverlessV2MaxCapacity: 2,
       serverlessV2MinCapacity: 0.5,
       readers: [
-        ClusterInstance.serverlessV2("ReaderNode1", {
+        rds.ClusterInstance.serverlessV2("ReaderNode1", {
           scaleWithWriter: true
         })
       ],
+      securityGroups: [securityGroup],
       deletionProtection: false,
       vpc: this.vpc,
       vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.100", "100.64.16.100"])]
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED
       })
     });
 
-    this.dbCluster.addRotationSingleUser({
-      automaticallyAfter: Duration.days(1),
-      vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-      }),
-      excludeCharacters: " %+:;{}"
-    });
+    // this.dbCluster.addRotationSingleUser({
+    //   automaticallyAfter: cdk.Duration.days(1),
+    //   vpcSubnets: this.vpc.selectSubnets({
+    //     subnetType: ec2.SubnetType.PRIVATE_ISOLATED
+    //   }),
+    //   excludeCharacters: " %+:;{}"
+    // });
     this.appUserCreds.attach(this.dbCluster);
+    this.dbCluster.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
 
-    new SecretRotation(this, "PGAppUserSecretRotation", {
-      application: SecretRotationApplication.POSTGRES_ROTATION_SINGLE_USER,
-      secret: this.appUserCreds,
-      target: this.dbCluster,
-      vpc: this.vpc,
-      vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-      }),
-      excludeCharacters: " %+:;{}"
-    });
-
-    const rotationSchedule = new RotationSchedule(this, "PGAppUserRotationSchedule", {
-      secret: this.appUserCreds,
-      // the properties below are optional
-      automaticallyAfter: cdk.Duration.days(1),
-      hostedRotation: HostedRotation.postgreSqlSingleUser({
-        functionName: "AppUserRotation",
-        vpc: this.vpc,
-        vpcSubnets: this.vpc.selectSubnets({
-          subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.12.1"])]
-        }),
-        excludeCharacters: " %+:;{}"
-      }),
-      rotateImmediatelyOnUpdate: true
-    });
+    // new secretsmanager.RotationSchedule(this, "PGAppUserRotationSchedule", {
+    //   secret: appuserAttachment,
+    //   // the properties below are optional
+    //   automaticallyAfter: cdk.Duration.days(1),
+    //   hostedRotation: secretsmanager.HostedRotation.postgreSqlSingleUser({
+    //     functionName: "AppUserRotation",
+    //     vpc: this.vpc,
+    //     vpcSubnets: this.vpc.selectSubnets({
+    //       subnetType: ec2.SubnetType.PRIVATE_ISOLATED
+    //     }),
+    //     excludeCharacters: " %+:;{}"
+    //   }),
+    //   rotateImmediatelyOnUpdate: true
+    // });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
       parameterName: ParamNames.PG_SG_ID,
@@ -177,27 +150,7 @@ export class DatabaseStack extends cdk.Stack {
       stringValue: buildJdbcUrl(this.dbCluster)
     });
 
-    const dbMigrator = new DBMigrationConstruct(this, "DBMigrate", {
-      vpc: this.vpc,
-      vpcSubnets: this.vpc.selectSubnets({
-        subnetFilters: [SubnetFilter.containsIpAddresses(["100.64.8.100"])]
-      }),
-      database: this.dbCluster,
-      masterPassword: this.dbCluster.secret || this.dbAdminCreds,
-      encryptionKey: this.kmsKey,
-      locations: new s3assets.Asset(this, `DataMigrationAssets${randomUUID()}`, {
-        deployTime: false,
-        path: path.resolve(__dirname, "../data-migration/sql")
-      }),
-      placeholders: {
-        appuser: "appuser"
-      },
-      secretPlaceHolders: {
-        appuserSecret: this.appUserCreds
-      }
-    });
-
-    function buildJdbcUrl(dbCluster: IDatabaseCluster): string {
+    function buildJdbcUrl(dbCluster: rds.IDatabaseCluster): string {
       return `jdbc:${dbCluster.engine?.engineType}://${dbCluster.clusterEndpoint.hostname}:${dbCluster.clusterEndpoint.port}/${props.serviceName}`;
     }
   }

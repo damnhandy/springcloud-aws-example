@@ -2,7 +2,6 @@ package com.damnhandy.functions.dbmigrator;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.events.CloudFormationCustomResourceEvent;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -13,29 +12,24 @@ import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.output.MigrateResult;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
-
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Uri;
 import software.amazon.awssdk.services.s3.S3Utilities;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.lambda.powertools.cloudformation.AbstractCustomResourceHandler;
 import software.amazon.lambda.powertools.cloudformation.Response;
-
-import software.amazon.lambda.powertools.logging.Logging;
 import software.amazon.lambda.powertools.logging.LoggingUtils;
-import software.amazon.lambda.powertools.metrics.Metrics;
 import software.amazon.lambda.powertools.parameters.ParamManager;
 import software.amazon.lambda.powertools.parameters.SecretsProvider;
 import software.amazon.lambda.powertools.parameters.transform.JsonTransformer;
-import software.amazon.lambda.powertools.tracing.Tracing;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.URI;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.UUID;
 
 import static software.amazon.lambda.powertools.utilities.EventDeserializer.extractDataFrom;
@@ -50,7 +44,7 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
     /**
      * Customizing the object mapper so that it can use Java 8+ features
      */
-    private static ObjectMapper objectMapper = new ObjectMapper();
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     static {
         objectMapper.registerModule(new ParameterNamesModule())
@@ -93,18 +87,13 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         return dbSecret;
     }
 
-    @Logging(logEvent = true)
-    @Metrics(captureColdStart = true)
-    @Tracing
     @Override
     protected Response create(CloudFormationCustomResourceEvent event, Context context) {
         String physicalResourceId = "DBMigrator-" + UUID.randomUUID();
+        logger.info("Pre-execute....");
         return this.execute(event,context, physicalResourceId);
     }
 
-    @Logging(logEvent = true)
-    @Metrics(captureColdStart = true)
-    @Tracing
     @Override
     protected Response update(CloudFormationCustomResourceEvent event, Context context) {
         return this.execute(event,context, event.getPhysicalResourceId());
@@ -120,9 +109,6 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
      * @return
      */
     protected Response execute(CloudFormationCustomResourceEvent event, Context context, String physicalResourceId) {
-        /**
-         * Get the CFN custom resource configuration properties.
-         */
         ResourceConfiguration configuration = extractDataFrom(event).as(ResourceConfiguration.class);
         DBSecret dbSecret = getSecret(event);
         logger.debug(String.format("configuring flyway with username %s ...",dbSecret.getUsername()));
@@ -134,27 +120,31 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        /**
-         * Configure Flyway
-         */
-        var flyway = Flyway.configure()
-                .configuration(configuration.buildConfig(dbSecret,sqlLocation,this.secretsProvider))
-                .load();
-        flyway.validate();
         try {
+
+            var flyway = Flyway.configure()
+                    .configuration(configuration.buildConfig(dbSecret,sqlLocation,this.secretsProvider))
+                    .load();
+            logger.info("Checking Flyway info....");
+            var info = flyway.info();
+            logger.info("Flyway Info: {}",info.getInfoResult().toString());
+            logger.info("validating SQL....");
+            flyway.validate();
+            logger.info("Validation successful");
             MigrateResult result = flyway.migrate();
-            logger.info("Migration result: {}",result.success);
+            var response = new DBDeploymentResponse(result.success,result.migrationsExecuted,result.flywayVersion);
+            logger.info("Migration result: {}", result.success);
             return Response.builder()
-                    .value(result.success)
+                    .value(response)
                     .status(Response.Status.SUCCESS)
                     .physicalResourceId(physicalResourceId)
                     .objectMapper(objectMapper)
                     .build();
         }
-        catch (FlywayException e) {
+        catch (Exception e) {
             logger.fatal(e);
             return Response.builder()
-                    .value(e.getMessage())
+                    .value(Map.of("Exception",e.getMessage()))
                     .status(Response.Status.FAILED)
                     .physicalResourceId(physicalResourceId)
                     .objectMapper(objectMapper)
@@ -162,15 +152,9 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         }
     }
 
-    @Logging(logEvent = true)
     @Override
     protected Response delete(CloudFormationCustomResourceEvent event, Context context) {
-        return Response.builder()
-                .value("No action")
-                .status(Response.Status.SUCCESS)
-                .physicalResourceId(event.getPhysicalResourceId())
-                .objectMapper(objectMapper)
-                .build();
+        return Response.success(event.getPhysicalResourceId());
     }
 
     /**
@@ -187,7 +171,7 @@ public class DBMigratorHandler extends AbstractCustomResourceHandler {
         // Unzip the CDK asset containing the SQL files to ephemeral lambda storage in /tmp
         Path sqlOutput = Files.createTempDirectory(dirname);
         UnzipUtil.unzip(downloadLocation.toAbsolutePath(), sqlOutput.toAbsolutePath());
-        // check that the ZIP file has extracted properly
+        logger.info("SQL package extracted to {}", sqlOutput.toAbsolutePath());
         if(isDirEmpty(sqlOutput)) {
             throw new RuntimeException("SQL Output Dir is empty");
         }

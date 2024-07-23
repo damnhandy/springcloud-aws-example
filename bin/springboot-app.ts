@@ -1,17 +1,15 @@
 #!/usr/bin/env node
 import "source-map-support/register";
 import * as cp from "child_process";
-import {
-  AppStagingSynthesizer,
-  IStagingResourcesFactory
-} from "@aws-cdk/app-staging-synthesizer-alpha";
+import { AppStagingSynthesizer } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as cdk from "aws-cdk-lib";
-import { App } from "aws-cdk-lib";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { PrototypeStagingStack } from "../lib/app-staging-stack";
-import { ApplicationStack } from "../lib/application-stack";
 import { DatabaseStack } from "../lib/database-stack";
-import { Ec2RdsBastionStack } from "../lib/ec2-rds-bastion-stack";
 import { FoundationStack } from "../lib/foundation-stack";
+import { SqlStack } from "../lib/sql-stack";
+import { VpcStack } from "../lib/vpc-stack";
+import { ApplicationStack } from "../lib/application-stack";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
 
@@ -20,7 +18,7 @@ const serviceName = "demoapp";
  */
 const revision = `git-${cp.execSync("git rev-parse HEAD").toString().trim()}`;
 
-const app = new App({
+const app = new cdk.App({
   defaultStackSynthesizer: AppStagingSynthesizer.customFactory({
     factory: PrototypeStagingStack.factory({
       appId: "demoapp",
@@ -43,25 +41,48 @@ const foundationStack = new FoundationStack(app, "FoundationStack", {
   revision: revision
 });
 
-const dbStack = new DatabaseStack(app, "DatabaseStack", {
+const vpcStack = new VpcStack(app, "VpcStack", {
+  env: env,
+  ipv4Cidr: "10.4.0.0/16"
+});
+
+const dbStack = new DatabaseStack(app, "DatabasePostgresStack", {
   env: env,
   artifactsBucket: foundationStack.artifactsBucket,
   revision: revision,
-  serviceName: serviceName
+  serviceName: serviceName,
+  vpc: vpcStack.vpc,
+  endpointSecurityGroup: vpcStack.endpointSecurityGroup
 });
 dbStack.addDependency(foundationStack);
 
-const ec2Stack = new Ec2RdsBastionStack(app, "RDSBastionStack", {
+const sqlStack = new SqlStack(app, "SqlStack", {
   env: env,
-  dbCluster: dbStack.dbCluster
+  logGroup: foundationStack.flywayLogGroup,
+  dbCluster: dbStack.dbCluster,
+  vpc: vpcStack.vpc,
+  encryptionKey: foundationStack.kmsKey,
+  dbMasterCreds: dbStack.dbAdminCreds,
+  placeholders: {
+    appuser: "appuser"
+  },
+  secretPlaceHolders: {
+    appuserSecret: dbStack.appUserCreds
+  }
 });
+sqlStack.addDependency(dbStack);
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
   env: env,
   serviceName: serviceName,
+  logGroup: foundationStack.appLogGroup,
   revision: revision,
-  dbCluster: dbStack.dbCluster
+  dbCluster: dbStack.dbCluster,
+  endpointSecurityGroup: vpcStack.endpointSecurityGroup,
+  vpc: vpcStack.vpc,
+  appUserSecret: dbStack.appUserCreds
 });
+appStack.addDependency(sqlStack);
 
 app.synth({
   validateOnSynthesis: true

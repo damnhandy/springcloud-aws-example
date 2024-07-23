@@ -1,19 +1,20 @@
 FROM registry.access.redhat.com/ubi8/ubi:8.8 as builder
 # We don't use the RedHat JDK distribution as it's not structured as a
 # modular JDK like OpenJDK or OracleJDK
-ENV JVM_VERSION=jdk-17.0.7+7
-RUN curl -LO https://github.com/adoptium/temurin17-binaries/releases/download/${JVM_VERSION}/OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
-RUN tar xzf OpenJDK17U-jdk_x64_linux_hotspot_17.0.7_7.tar.gz
+ENV JVM_VERSION=jdk-17.0.12+7
+ENV JDK_VERSION=17.0.12_7
+RUN curl -LO https://github.com/adoptium/temurin17-binaries/releases/download/${JVM_VERSION}/OpenJDK17U-jdk_x64_linux_hotspot_${JDK_VERSION}.tar.gz
+RUN tar xzf OpenJDK17U-jdk_x64_linux_hotspot_${JDK_VERSION}.tar.gz
 RUN mv ${JVM_VERSION} /usr/local
 ENV JAVA_HOME /usr/local/${JVM_VERSION}
 ENV PATH ${JAVA_HOME}/bin:${PATH}
 
-RUN curl -LO https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.7%2B7/OpenJDK17U-jre_x64_linux_hotspot_17.0.7_7.tar.gz
+RUN curl -LO https://github.com/adoptium/temurin17-binaries/releases/download/${JVM_VERSION}/OpenJDK17U-jre_x64_linux_hotspot_${JDK_VERSION}.tar.gz
 
 ENV TMP_ROOT=/chroot/app
 RUN mkdir -p ${TMP_ROOT}/var/lib/rpm
 RUN mkdir -p ${TMP_ROOT}/usr/local
-RUN tar -xf OpenJDK17U-jre_x64_linux_hotspot_17.0.7_7.tar.gz -C ${TMP_ROOT}/usr/local
+RUN tar -xf OpenJDK17U-jre_x64_linux_hotspot_${JDK_VERSION}.tar.gz -C ${TMP_ROOT}/usr/local
 
 # Install the DNF plugins so we can run dnf download
 RUN dnf install -y dnf-plugins-core
@@ -48,9 +49,10 @@ WORKDIR /opt/project
 RUN ./gradlew clean build -x test --no-daemon --stacktrace
 
 # Add the RDS root certs so we can make connections to RDS over TLS when running in AWS
-RUN curl -L https://truststore.pki.rds.amazonaws.com/us-east-1/us-east-1-bundle.pem -o us-east-1-bundle.pem
-RUN keytool -importcert -alias AWS-RDS -file us-east-1-bundle.pem -keystore \
-  ${TMP_ROOT}/usr/local/${JVM_VERSION}-jre/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit
+RUN curl -L https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem -o /opt/project/global-bundle.pem
+#RUN keytool -importcert -alias AWS-RDS -file /opt/project/global-bundle.pem -keystore \
+#  ${TMP_ROOT}/usr/local/${JVM_VERSION}-jre/lib/security/cacerts -storetype pkcs12 -noprompt -storepass changeit \
+
 
 RUN groupadd -r appuser --root ${TMP_ROOT}
 RUN useradd -r appuser -G appuser --root ${TMP_ROOT}
@@ -64,11 +66,13 @@ RUN find "${TMP_ROOT}/tmp" -mindepth 1 -delete
 FROM scratch
 COPY --from=builder /chroot/app /
 COPY --from=builder --chown=appuser:appuser /opt/project/build/libs/springboot-app-1.0.0.jar /opt/app/springboot-app.jar
+COPY --from=builder --chown=appuser:appuser /opt/project/global-bundle.pem /opt/app/global-bundle.pem
+ENV JVM_VERSION=jdk-17.0.12+7
 # Creating symlinks to /dev/stdout so that all logs are sent to the containers logstream.
 RUN mkdir -p /var/log/demoapp \
   && ln -s /dev/stdout /var/log/demoapp/access_log \
   && ln -s /dev/stdout /var/log/demoapp/access_log_management \
-  && ln -s /usr/local/jdk-17.0.7+7-jre /usr/local/jre \
+  && ln -s /usr/local/${JVM_VERSION}-jre /usr/local/jre \
   && chown -R appuser:appuser /var/log/demoapp
 ENV LANG=en_US.UTF-8 \
   LANGUAGE=en_US:en \

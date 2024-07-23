@@ -20,6 +20,17 @@
     "java.compile.nullAnalysis.mode": "automatic",
     "java.configuration.updateBuildConfiguration": "interactive",
     "cSpell.words": [
-        "JDBC"
+        "appuser",
+        "damnhandy",
+        "dbmigrator",
+        "dbname",
+        "demoapp",
+        "elasticloadbalancingv",
+        "Fargate",
+        "JDBC",
+        "mebibytes",
+        "POWERTOOLS",
+        "servicenetwork",
+        "springboot"
     ]
 }

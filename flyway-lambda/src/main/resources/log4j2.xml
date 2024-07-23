@@ -11,10 +11,22 @@
 
     </Appenders>
     <Loggers>
-        <Logger name="JsonLogger" level="debug" additivity="true">
+        <Logger name="org.postgresql" level="${env:LOG_LEVEL:-debug}" additivity="true">
             <AppenderRef ref="JsonAppender"/>
         </Logger>
-        <Root level="debug">
+<!--        <Logger name="org.flywaydb.core.internal.scanner.Scanner" level="WARN" additivity="true">-->
+<!--            <AppenderRef ref="JsonAppender"/>-->
+<!--        </Logger>-->
+<!--        <Logger name="org.flywaydb.core.internal.scanner.filesystem.FileSystemScanner" level="WARN" additivity="true">-->
+<!--            <AppenderRef ref="JsonAppender"/>-->
+<!--        </Logger>-->
+<!--        <Logger name="org.flywaydb.core.internal.database.DatabaseTypeRegister" level="WARN" additivity="true">-->
+<!--            <AppenderRef ref="JsonAppender"/>-->
+<!--        </Logger>-->
+<!--        <Logger name="org.flywaydb.core.internal.resource.ResourceNameValidator" level="WARN" additivity="true">-->
+<!--            <AppenderRef ref="JsonAppender"/>-->
+<!--        </Logger>-->
+        <Root level="${env:LOG_LEVEL:-debug}">
             <AppenderRef ref="JsonAppender"/>
         </Root>
     </Loggers>

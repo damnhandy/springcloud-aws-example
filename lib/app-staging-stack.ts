@@ -8,6 +8,7 @@ import {
   ImageStagingLocation
 } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as ecr from "aws-cdk-lib/aws-ecr";
+import { TagStatus } from "aws-cdk-lib/aws-ecr";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -27,7 +28,6 @@ import {
 import { StringSpecializer } from "aws-cdk-lib/core/lib/helpers-internal";
 import * as cxapi from "aws-cdk-lib/cx-api";
 import { Construct } from "constructs";
-import { TagStatus } from "aws-cdk-lib/aws-ecr";
 
 export const DEPLOY_TIME_PREFIX = "deploy-time/";
 
@@ -238,7 +238,11 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
 
   private readonly deployRoleArn?: string;
 
-  constructor(scope: App, id: string, private readonly props: PrototypeStagingStackProps) {
+  constructor(
+    scope: App,
+    id: string,
+    private readonly props: PrototypeStagingStackProps
+  ) {
     super(scope, id, {
       ...props,
       synthesizer: new BootstraplessSynthesizer(),

@@ -54,7 +54,7 @@ public class ResourceConfiguration {
     }
 
     public Configuration buildConfig(DBSecret masterDBSecret, Path localSqlLocation, SecretsProvider secretsProvider) {
-        var jdbcUrl = String.format("jdbc:%s://%s:%s/%s?ssl=true?sslmode=verify-ca",
+        var jdbcUrl = String.format("jdbc:%s://%s:%s/%s",
                 "postgresql",
                 masterDBSecret.getHost(),
                 masterDBSecret.getPort(),
@@ -65,6 +65,8 @@ public class ResourceConfiguration {
         configuration.placeholders(this.getPlaceHolders())
                 .dataSource(jdbcUrl, masterDBSecret.getUsername(), masterDBSecret.getPassword())
                      .mixed(this.getMixed())
+                     .defaultSchema("demoapp")
+                     .baselineOnMigrate(true)
                      .ignoreMigrationPatterns("*:pending")
                      .locations("filesystem:".concat(localSqlLocation.toString()));
         logger.debug("Dumpling place holders:");
