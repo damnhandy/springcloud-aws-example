@@ -1,7 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as logs from "aws-cdk-lib/aws-logs";
-import * as s3 from "aws-cdk-lib/aws-s3";
+import * as route53 from "aws-cdk-lib/aws-route53";
+import * as route53profiles from "aws-cdk-lib/aws-route53profiles";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
@@ -9,11 +9,13 @@ import { ParamNames } from "./names";
 
 export interface VpcStackProps extends cdk.StackProps {
   readonly ipv4Cidr: string;
+  readonly serviceNetworkArn: string;
 }
 
 export class VpcStack extends cdk.Stack {
   public readonly vpc: ec2.IVpc;
   public readonly endpointSecurityGroup: ec2.ISecurityGroup;
+  public readonly privateHostedZone: route53.IPrivateHostedZone;
 
   constructor(scope: Construct, id: string, props: VpcStackProps) {
     super(scope, id, props);
@@ -93,6 +95,11 @@ export class VpcStack extends cdk.Stack {
       securityGroups: [this.endpointSecurityGroup]
     });
 
+    this.vpc.addInterfaceEndpoint("ssm-messages", {
+      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
+      securityGroups: [this.endpointSecurityGroup]
+    });
+
     this.vpc.addInterfaceEndpoint("logs", {
       service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
       securityGroups: [this.endpointSecurityGroup]
@@ -165,23 +172,45 @@ export class VpcStack extends cdk.Stack {
       description: "Access to VPC Lattice Services"
     });
     cdk.Tags.of(latticeSecurityGroup).add("Name", "LatticeSecurityGroup");
+
     latticeSecurityGroup.addIngressRule(
-      ec2.Peer.prefixList("pl-07cbd8b5e26960eac"),
+      ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
       ec2.Port.HTTPS,
       "Allow HTTPS ingress for VPC endpoints"
     );
     latticeSecurityGroup.addIngressRule(
-      ec2.Peer.prefixList("pl-073555187c4e6ccf2"),
+      ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
       ec2.Port.HTTPS,
       "Allow HTTPS ingress for VPC endpoints"
     );
 
-    const serviceNetworkArn = this.node.tryGetContext("serviceNetworkArn");
+    latticeSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
+      ec2.Port.HTTP,
+      "Allow HTTP ingress for VPC endpoints"
+    );
+    latticeSecurityGroup.addIngressRule(
+      ec2.Peer.ipv4(this.vpc.vpcCidrBlock),
+      ec2.Port.HTTP,
+      "Allow HTTP ingress for VPC endpoints"
+    );
 
     new vpclattice.CfnServiceNetworkVpcAssociation(this, "ServiceNetworkAssociation", {
-      serviceNetworkIdentifier: serviceNetworkArn,
+      serviceNetworkIdentifier: props.serviceNetworkArn,
       vpcIdentifier: this.vpc.vpcId,
       securityGroupIds: [latticeSecurityGroup.securityGroupId]
+    });
+
+    this.privateHostedZone = new route53.PrivateHostedZone(this, "PrivateHostedZone", {
+      vpc: this.vpc,
+      comment: "Private hosted zone for internal DNS resolution",
+      zoneName: "apps.gs.internal"
+    });
+
+    new route53profiles.CfnProfileAssociation(this, "ProfileToVpcAssociation", {
+      name: "DefaultProfileAssociation",
+      profileId: "rp-ec1a84ce4d804ec9",
+      resourceId: this.vpc.vpcId
     });
   }
 }

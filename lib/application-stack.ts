@@ -9,6 +9,7 @@ import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
 
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as route53 from "aws-cdk-lib/aws-route53";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
@@ -27,6 +28,8 @@ export interface ApplicationStackProps extends cdk.StackProps {
   readonly endpointSecurityGroup: ec2.ISecurityGroup;
   readonly logGroup: logs.ILogGroup;
   readonly appUserSecret: secretsmanager.ISecret;
+  readonly serviceNetworkArn: string;
+  readonly privateHostedZone: route53.IPrivateHostedZone;
 }
 
 /**
@@ -36,6 +39,8 @@ export class ApplicationStack extends cdk.Stack {
   appRepo: ecr.IRepository;
   vpc: ec2.IVpc;
   kmsKey: kms.IKey;
+
+  public readonly alb: lb.IApplicationLoadBalancer;
 
   constructor(scope: Construct, id: string, props: ApplicationStackProps) {
     super(scope, id, props);
@@ -110,6 +115,24 @@ export class ApplicationStack extends cdk.Stack {
     ecsSecurityGroup.connections.allowTo(props.dbCluster, ec2.Port.tcp(5432));
     ecsSecurityGroup.connections.allowTo(ec2.Peer.prefixList("pl-63a5400a"), ec2.Port.tcp(443));
 
+    ecsSecurityGroup.connections.allowTo(
+      ec2.Peer.prefixList("pl-07cbd8b5e26960eac"),
+      ec2.Port.tcp(80)
+    );
+    ecsSecurityGroup.connections.allowTo(
+      ec2.Peer.prefixList("pl-073555187c4e6ccf2"),
+      ec2.Port.tcp(80)
+    );
+
+    ecsSecurityGroup.connections.allowTo(
+      ec2.Peer.prefixList("pl-07cbd8b5e26960eac"),
+      ec2.Port.tcp(443)
+    );
+    ecsSecurityGroup.connections.allowTo(
+      ec2.Peer.prefixList("pl-073555187c4e6ccf2"),
+      ec2.Port.tcp(443)
+    );
+
     const service = new ecs.FargateService(this, "DemoAppService", {
       assignPublicIp: false,
       cluster,
@@ -121,10 +144,24 @@ export class ApplicationStack extends cdk.Stack {
       })
     });
 
-    const alb = new lb.ApplicationLoadBalancer(this, "DemoAppAlb", {
+    const albSg = new ec2.SecurityGroup(this, "DemoAppAlbSecurityGroup", {
+      allowAllIpv6Outbound: false,
+      allowAllOutbound: false,
+      disableInlineRules: true,
+      vpc: props.vpc
+    });
+    cdk.Tags.of(albSg).add("Name", "DemoAppAlbSecurityGroup");
+    albSg.connections.allowFrom(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(80));
+    albSg.connections.allowFrom(ec2.Peer.prefixList("pl-07cbd8b5e26960eac"), ec2.Port.tcp(80));
+    albSg.connections.allowFrom(ec2.Peer.prefixList("pl-073555187c4e6ccf2"), ec2.Port.tcp(80));
+
+    albSg.connections.allowFrom(ec2.Peer.prefixList("pl-07cbd8b5e26960eac"), ec2.Port.tcp(443));
+    albSg.connections.allowFrom(ec2.Peer.prefixList("pl-073555187c4e6ccf2"), ec2.Port.tcp(443));
+
+    this.alb = new lb.ApplicationLoadBalancer(this, "DemoAppAlb", {
       vpc: this.vpc,
-      ipAddressType: lb.IpAddressType.IPV4,
       internetFacing: false,
+      securityGroup: albSg,
       vpcSubnets: this.vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED
       })
@@ -132,14 +169,14 @@ export class ApplicationStack extends cdk.Stack {
     /**
      * Primary HTTP port
      */
-    service.connections.allowFrom(alb, ec2.Port.tcp(8080));
+    service.connections.allowFrom(this.alb, ec2.Port.tcp(8080));
     /**
      * Health check endpoint
      */
-    service.connections.allowFrom(alb, ec2.Port.tcp(8081));
+    service.connections.allowFrom(this.alb, ec2.Port.tcp(8081));
     service.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
 
-    const listener = alb.addListener("DemoAppAlbListener", {
+    const listener = this.alb.addListener("DemoAppAlbListener", {
       open: true,
       protocol: lb.ApplicationProtocol.HTTP
     });
@@ -147,6 +184,7 @@ export class ApplicationStack extends cdk.Stack {
     listener.addTargets("DemoAppTargetGroup", {
       protocol: lb.ApplicationProtocol.HTTP,
       protocolVersion: lb.ApplicationProtocolVersion.HTTP1,
+      port: 80,
       targets: [
         service.loadBalancerTarget({
           containerName: container.containerName,
@@ -164,12 +202,8 @@ export class ApplicationStack extends cdk.Stack {
       }
     });
 
-    service.taskDefinition.defaultContainer?.addPortMappings({
-      containerPort: 8081
-    });
-
-    alb.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
-    alb.connections.allowTo(service, ec2.Port.tcp(8081), "ALB Health Check");
+    this.alb.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
+    this.alb.connections.allowTo(service, ec2.Port.tcp(8081), "ALB Health Check");
     appUserCredentials.grantRead(service.taskDefinition.taskRole);
 
     this.kmsKey.grantDecrypt(service.taskDefinition.taskRole);

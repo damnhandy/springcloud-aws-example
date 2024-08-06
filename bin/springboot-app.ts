@@ -3,13 +3,14 @@ import "source-map-support/register";
 import * as cp from "child_process";
 import { AppStagingSynthesizer } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as cdk from "aws-cdk-lib";
-import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { PrototypeStagingStack } from "../lib/app-staging-stack";
+import { ApplicationServiceStack } from "../lib/application-service-stack";
+import { ApplicationStack } from "../lib/application-stack";
 import { DatabaseStack } from "../lib/database-stack";
+import { EC2TesterStack } from "../lib/ec2-host";
 import { FoundationStack } from "../lib/foundation-stack";
 import { SqlStack } from "../lib/sql-stack";
 import { VpcStack } from "../lib/vpc-stack";
-import { ApplicationStack } from "../lib/application-stack";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
 
@@ -30,6 +31,8 @@ const app = new cdk.App({
   })
 });
 
+const serviceNetworkArn = app.node.tryGetContext("serviceNetworkArn");
+
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION
@@ -43,7 +46,13 @@ const foundationStack = new FoundationStack(app, "FoundationStack", {
 
 const vpcStack = new VpcStack(app, "VpcStack", {
   env: env,
-  ipv4Cidr: "10.4.0.0/16"
+  ipv4Cidr: "10.4.0.0/16",
+  serviceNetworkArn: serviceNetworkArn
+});
+new EC2TesterStack(app, "EC2TesterStack", {
+  env: env,
+  vpc: vpcStack.vpc,
+  endpointSecurityGroup: vpcStack.endpointSecurityGroup
 });
 
 const dbStack = new DatabaseStack(app, "DatabasePostgresStack", {
@@ -64,10 +73,12 @@ const sqlStack = new SqlStack(app, "SqlStack", {
   encryptionKey: foundationStack.kmsKey,
   dbMasterCreds: dbStack.dbAdminCreds,
   placeholders: {
-    appuser: "appuser"
+    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+    appuser_username: "appuser"
   },
   secretPlaceHolders: {
-    appuserSecret: dbStack.appUserCreds
+    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+    appuser_secret: dbStack.appUserCreds
   }
 });
 sqlStack.addDependency(dbStack);
@@ -80,9 +91,21 @@ const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
   dbCluster: dbStack.dbCluster,
   endpointSecurityGroup: vpcStack.endpointSecurityGroup,
   vpc: vpcStack.vpc,
-  appUserSecret: dbStack.appUserCreds
+  appUserSecret: dbStack.appUserCreds,
+  serviceNetworkArn: serviceNetworkArn,
+  privateHostedZone: vpcStack.privateHostedZone
 });
 appStack.addDependency(sqlStack);
+
+new ApplicationServiceStack(app, "SpringBootDemoAppServiceStack", {
+  env: env,
+  serviceName: serviceName,
+  vpc: vpcStack.vpc,
+  kmsKey: foundationStack.kmsKey,
+  serviceNetworkArn: serviceNetworkArn,
+  privateHostedZone: vpcStack.privateHostedZone,
+  loadBalancer: appStack.alb
+});
 
 app.synth({
   validateOnSynthesis: true

@@ -1,7 +1,4 @@
 # Docker Compose file Reference (https://docs.docker.com/compose/compose-file/)
-
-version: "3.9"
-
 services:
   springboot-app:
     container_name: springboot-app
@@ -75,7 +72,7 @@ services:
       AWS_REGION: us-east-1
       FLYWAY_USER: postgres
       FLYWAY_PASSWORD: /run/secrets/root_password
-      FLYWAY_PLACEHOLDERS_APPUSER: appuser
+      FLYWAY_PLACEHOLDERS_APPUSER_USERNAME: appuser
       FLYWAY_PLACEHOLDERS_APPUSERPW: /run/secrets/appuser_password
       JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8"
     volumes:
@@ -86,7 +83,7 @@ services:
 
   postgres:
     container_name: postgres
-    image: postgres:15
+    image: postgres:16
     user: postgres
     command:
       - "-c"
@@ -125,7 +122,19 @@ services:
       - source: server_cert
         target: server.crt
         mode: 0600
-
+  envoy:
+    build:
+      context: envoy
+      dockerfile: Dockerfile
+    networks:
+      - demo
+    links:
+      - springboot-app
+    restart: on-failure
+    depends_on:
+      - springboot-app
+    ports:
+      - "8585:8585"
 secrets:
   root_password:
     file: ./credentials/root_password

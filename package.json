@@ -2,7 +2,7 @@
   "name": "springboot-app",
   "version": "0.1.0",
   "bin": {
-    "infrastructure": "bin/sprhttps://d-90676457c9.awsapps.com/start/#/?tab=accountsingboot-app.js"
+    "infrastructure": "bin/springboot-app.js"
   },
   "scripts": {
     "build": "tsc",
