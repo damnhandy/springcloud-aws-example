@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import {
   BootstrapRole,
   FileStagingLocation,
@@ -124,7 +124,7 @@ export interface PrototypeStagingStackOptions {
 /**
  * Default Staging Stack Properties
  */
-export interface PrototypeStagingStackProps extends PrototypeStagingStackOptions, StackProps {
+export interface PrototypeStagingStackProperties extends PrototypeStagingStackOptions, StackProps {
   /**
    * The ARN of the deploy action role, if given
    *
@@ -153,9 +153,9 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
    * Return a factory that will create DefaultStagingStacks
    */
   public static factory(options: PrototypeStagingStackOptions): IStagingResourcesFactory {
-    const appId = options.appId
-      .toLocaleLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
+    const appId: string = options.appId
+      .toLowerCase()
+      .replaceAll(/[^a-z0-9-]/g, "-")
       .slice(0, 20);
     return {
       obtainStagingResources(stack, context) {
@@ -241,10 +241,10 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
   constructor(
     scope: App,
     id: string,
-    private readonly props: PrototypeStagingStackProps
+    private readonly properties: PrototypeStagingStackProperties
   ) {
     super(scope, id, {
-      ...props,
+      ...properties,
       synthesizer: new BootstraplessSynthesizer(),
       analyticsReporting: false // removing AWS::CDK::Metadata construct saves ~3KB
     });
@@ -255,17 +255,17 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     // resources because the staging bucket necessary for custom resource assets
     // does not exist yet.
     this.node.setContext(INLINE_CUSTOM_RESOURCE_CONTEXT, true);
-    this.autoDeleteStagingAssets = props.autoDeleteStagingAssets ?? true;
+    this.autoDeleteStagingAssets = properties.autoDeleteStagingAssets ?? true;
 
-    this.appId = this.validateAppId(props.appId);
+    this.appId = this.validateAppId(properties.appId);
     this.dependencyStack = this;
 
-    this.deployRoleArn = props.deployRoleArn;
-    this.stagingBucketName = props.stagingBucketName;
-    const specializer = new StringSpecializer(this, props.qualifier);
+    this.deployRoleArn = properties.deployRoleArn;
+    this.stagingBucketName = properties.stagingBucketName;
+    const specializer = new StringSpecializer(this, properties.qualifier);
 
-    this.providedFileRole = props.fileAssetPublishingRole?._specialize(specializer);
-    this.providedImageRole = props.imageAssetPublishingRole?._specialize(specializer);
+    this.providedFileRole = properties.fileAssetPublishingRole?._specialize(specializer);
+    this.providedImageRole = properties.imageAssetPublishingRole?._specialize(specializer);
     this.stagingRepos = {};
   }
 
@@ -403,7 +403,7 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
 
     bucket.addLifecycleRule({
       prefix: DEPLOY_TIME_PREFIX,
-      expiration: this.props.deployTimeFileAssetLifetime ?? Duration.days(30)
+      expiration: this.properties.deployTimeFileAssetLifetime ?? Duration.days(30)
     });
 
     return stagingBucketName;
@@ -430,7 +430,7 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
         lifecycleRules: [
           {
             description: "Garbage collect old image versions",
-            maxImageCount: this.props.imageAssetVersionCount ?? 3,
+            maxImageCount: this.properties.imageAssetVersionCount ?? 3,
             rulePriority: 90,
             tagStatus: TagStatus.UNTAGGED
           },
@@ -438,7 +438,7 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
             description:
               "Limits the number of days that a tagged container image can reside in the repo. " +
               "The default is 120 days",
-            maxImageAge: Duration.days(this.props.maxImageAge || 90),
+            maxImageAge: Duration.days(this.properties.maxImageAge ?? 90),
             rulePriority: 100,
             tagStatus: TagStatus.ANY
           }
@@ -492,13 +492,13 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
    * Synthesizes the cloudformation template into a cloud assembly.
    * @internal
    */
-  public _synthesizeTemplate(session: ISynthesisSession, lookupRoleArn?: string | undefined): void {
+  public _synthesizeTemplate(session: ISynthesisSession, lookupRoleArn?: string): void {
     super._synthesizeTemplate(session, lookupRoleArn);
 
     const builder = session.assembly;
     const outPath = path.join(builder.outdir, this.templateFile);
     const size = fs.statSync(outPath).size;
-    if (size > 51200) {
+    if (size > 51_200) {
       throw new Error(
         `Staging resource template cannot be greater than 51200 bytes, but got ${size} bytes`
       );

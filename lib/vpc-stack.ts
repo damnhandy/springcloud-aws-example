@@ -5,9 +5,9 @@ import * as route53profiles from "aws-cdk-lib/aws-route53profiles";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
-import { ParamNames } from "./names";
+import { ParamNames as ParameterNames } from "./names";
 
-export interface VpcStackProps extends cdk.StackProps {
+export interface VpcStackProperties extends cdk.StackProps {
   readonly ipv4Cidr: string;
   readonly serviceNetworkArn: string;
 }
@@ -17,8 +17,8 @@ export class VpcStack extends cdk.Stack {
   public readonly endpointSecurityGroup: ec2.ISecurityGroup;
   public readonly privateHostedZone: route53.IPrivateHostedZone;
 
-  constructor(scope: Construct, id: string, props: VpcStackProps) {
-    super(scope, id, props);
+  constructor(scope: Construct, id: string, properties: VpcStackProperties) {
+    super(scope, id, properties);
 
     this.vpc = new ec2.Vpc(this, "DemoAppVpc", {
       vpcName: "DemoAppVpc",
@@ -29,7 +29,7 @@ export class VpcStack extends cdk.Stack {
       createInternetGateway: false,
       restrictDefaultSecurityGroup: true,
       ipProtocol: ec2.IpProtocol.DUAL_STACK,
-      ipAddresses: ec2.IpAddresses.cidr(props.ipv4Cidr),
+      ipAddresses: ec2.IpAddresses.cidr(properties.ipv4Cidr),
       ipv6Addresses: ec2.Ipv6Addresses.amazonProvided(),
       defaultInstanceTenancy: ec2.DefaultInstanceTenancy.DEFAULT,
       gatewayEndpoints: {
@@ -61,7 +61,7 @@ export class VpcStack extends cdk.Stack {
 
     new ssm.StringParameter(this, "EndpointSecurityGroupParam", {
       stringValue: this.endpointSecurityGroup.securityGroupId,
-      parameterName: ParamNames.ENDPOINT_SG_ID,
+      parameterName: ParameterNames.ENDPOINT_SG_ID,
       description: "Security group ID for VPC endpoints"
     });
 
@@ -196,7 +196,7 @@ export class VpcStack extends cdk.Stack {
     );
 
     new vpclattice.CfnServiceNetworkVpcAssociation(this, "ServiceNetworkAssociation", {
-      serviceNetworkIdentifier: props.serviceNetworkArn,
+      serviceNetworkIdentifier: properties.serviceNetworkArn,
       vpcIdentifier: this.vpc.vpcId,
       securityGroupIds: [latticeSecurityGroup.securityGroupId]
     });

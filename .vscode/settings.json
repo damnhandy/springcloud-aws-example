@@ -21,6 +21,7 @@
     "java.configuration.updateBuildConfiguration": "disabled",
     "cSpell.words": [
         "appuser",
+        "Bootstrapless",
         "camelcase",
         "CODECATALYST",
         "damnhandy",
@@ -33,7 +34,12 @@
         "mebibytes",
         "POWERTOOLS",
         "servicenetwork",
+        "specializer",
         "springboot",
-        "svcs"
-    ]
+        "svcs",
+        "syncpack"
+    ],
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
 }

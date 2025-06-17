@@ -9,7 +9,7 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
 
-export interface ApplicationServiceStackProps extends cdk.StackProps {
+export interface ApplicationServiceStackProperties extends cdk.StackProps {
   readonly serviceName: string;
   readonly vpc: ec2.IVpc;
   readonly kmsKey: kms.IKey;
@@ -19,19 +19,19 @@ export interface ApplicationServiceStackProps extends cdk.StackProps {
 }
 
 export class ApplicationServiceStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: ApplicationServiceStackProps) {
-    super(scope, id, props);
+  constructor(scope: Construct, id: string, properties: ApplicationServiceStackProperties) {
+    super(scope, id, properties);
 
-    const internalName = `${props.serviceName}.apps.gs.internal`;
+    const internalName = `${properties.serviceName}.apps.gs.internal`;
 
     const demoAppService = new vpclattice.CfnService(this, "DemoAppServiceInterface", {
-      name: `${props.serviceName}-service-interface`,
+      name: `${properties.serviceName}-service-interface`,
       authType: "AWS_IAM",
-      customDomainName: `${props.serviceName}.apps.gs.internal`
+      customDomainName: `${properties.serviceName}.apps.gs.internal`
     });
 
     new route53.RecordSet(this, "DemoAppCNameRecord", {
-      zone: props.privateHostedZone,
+      zone: properties.privateHostedZone,
       recordName: internalName,
       recordType: route53.RecordType.CNAME,
       target: route53.RecordTarget.fromValues(demoAppService.attrDnsEntryDomainName)
@@ -52,7 +52,7 @@ export class ApplicationServiceStack extends cdk.Stack {
     });
 
     const serviceLogGroup = new logs.LogGroup(this, "DemoAppServiceInterfaceLogGroup", {
-      encryptionKey: props.kmsKey,
+      encryptionKey: properties.kmsKey,
       logGroupName: `/app/lattice/service/${demoAppService.name}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY
@@ -70,7 +70,7 @@ export class ApplicationServiceStack extends cdk.Stack {
         type: "ALB",
         targets: [
           {
-            id: props.loadBalancer.loadBalancerArn,
+            id: properties.loadBalancer.loadBalancerArn,
             port: 80
           }
         ],
@@ -78,7 +78,7 @@ export class ApplicationServiceStack extends cdk.Stack {
           port: 80,
           protocol: "HTTP",
           protocolVersion: "HTTP1",
-          vpcIdentifier: props.vpc!.vpcId
+          vpcIdentifier: properties.vpc.vpcId
         }
       }
     );
@@ -98,7 +98,7 @@ export class ApplicationServiceStack extends cdk.Stack {
       serviceIdentifier: demoAppService.attrArn
     });
 
-    const serviceNetworkArn = this.node.tryGetContext("serviceNetworkArn");
+    const serviceNetworkArn = this.node.tryGetContext("serviceNetworkArn") as string;
 
     new vpclattice.CfnServiceNetworkServiceAssociation(this, `DemoAppServiceInterfaceAssociation`, {
       serviceIdentifier: demoAppService.attrArn,

@@ -1,4 +1,4 @@
-import * as path from "path";
+import * as path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
@@ -15,12 +15,12 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
 
-import { ParamNames } from "./names";
+import { ParamNames as ParameterNames } from "./names";
 
 /**
  *
  */
-export interface ApplicationStackProps extends cdk.StackProps {
+export interface ApplicationStackProperties extends cdk.StackProps {
   readonly serviceName: string;
   readonly revision: string;
   readonly dbCluster: rds.IDatabaseCluster;
@@ -42,20 +42,20 @@ export class ApplicationStack extends cdk.Stack {
 
   public readonly alb: lb.IApplicationLoadBalancer;
 
-  constructor(scope: Construct, id: string, props: ApplicationStackProps) {
-    super(scope, id, props);
+  constructor(scope: Construct, id: string, properties: ApplicationStackProperties) {
+    super(scope, id, properties);
 
-    this.vpc = props.vpc;
+    this.vpc = properties.vpc;
     this.kmsKey = kms.Key.fromKeyArn(
       this,
       "KmsKeyRef",
-      ssm.StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
+      ssm.StringParameter.valueForStringParameter(this, ParameterNames.KMS_ARN)
     );
 
     const appUserCredentials = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AppUserSecret",
-      ParamNames.DEMO_APP_USER_SECRET
+      ParameterNames.DEMO_APP_USER_SECRET
     );
 
     const cluster = new ecs.Cluster(this, "DemoCluster", {
@@ -69,20 +69,20 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     const container = taskDefinition.addContainer("DemoAppContainer", {
-      containerName: `${props.serviceName}-container`,
+      containerName: `${properties.serviceName}-container`,
       image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app"), {
         assetName: "springboot-app"
       }),
       logging: ecs.LogDriver.awsLogs({
-        logGroup: props.logGroup,
-        streamPrefix: `${props.serviceName}`
+        logGroup: properties.logGroup,
+        streamPrefix: properties.serviceName
       }),
       secrets: {
-        DEMOAPP_DB_USERNAME: ecs.Secret.fromSecretsManager(props.appUserSecret, "username"),
-        DEMOAPP_DB_PASSWORD: ecs.Secret.fromSecretsManager(props.appUserSecret, "password"),
-        DEMOAPP_DB_NAME: ecs.Secret.fromSecretsManager(props.appUserSecret, "dbname"),
-        DEMOAPP_DB_HOST: ecs.Secret.fromSecretsManager(props.appUserSecret, "host"),
-        DEMOAPP_DB_PORT: ecs.Secret.fromSecretsManager(props.appUserSecret, "port")
+        DEMOAPP_DB_USERNAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "username"),
+        DEMOAPP_DB_PASSWORD: ecs.Secret.fromSecretsManager(properties.appUserSecret, "password"),
+        DEMOAPP_DB_NAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "dbname"),
+        DEMOAPP_DB_HOST: ecs.Secret.fromSecretsManager(properties.appUserSecret, "host"),
+        DEMOAPP_DB_PORT: ecs.Secret.fromSecretsManager(properties.appUserSecret, "port")
       },
       environment: {
         SPRING_PROFILES_ACTIVE: "aws",
@@ -90,7 +90,7 @@ export class ApplicationStack extends cdk.Stack {
       }
     });
     this.kmsKey.grantEncryptDecrypt(taskDefinition.obtainExecutionRole());
-    props.appUserSecret.grantRead(taskDefinition.obtainExecutionRole());
+    properties.appUserSecret.grantRead(taskDefinition.obtainExecutionRole());
     /**
      * Expose the default HTTP endpoint for access through the ALB
      */
@@ -111,8 +111,8 @@ export class ApplicationStack extends cdk.Stack {
       allowAllOutbound: false,
       disableInlineRules: true
     });
-    ecsSecurityGroup.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
-    ecsSecurityGroup.connections.allowTo(props.dbCluster, ec2.Port.tcp(5432));
+    ecsSecurityGroup.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
+    ecsSecurityGroup.connections.allowTo(properties.dbCluster, ec2.Port.tcp(5432));
     ecsSecurityGroup.connections.allowTo(ec2.Peer.prefixList("pl-63a5400a"), ec2.Port.tcp(443));
 
     ecsSecurityGroup.connections.allowTo(
@@ -148,10 +148,10 @@ export class ApplicationStack extends cdk.Stack {
       allowAllIpv6Outbound: false,
       allowAllOutbound: false,
       disableInlineRules: true,
-      vpc: props.vpc
+      vpc: properties.vpc
     });
     cdk.Tags.of(albSg).add("Name", "DemoAppAlbSecurityGroup");
-    albSg.connections.allowFrom(ec2.Peer.ipv4(props.vpc.vpcCidrBlock), ec2.Port.tcp(80));
+    albSg.connections.allowFrom(ec2.Peer.ipv4(properties.vpc.vpcCidrBlock), ec2.Port.tcp(80));
     albSg.connections.allowFrom(ec2.Peer.prefixList("pl-07cbd8b5e26960eac"), ec2.Port.tcp(80));
     albSg.connections.allowFrom(ec2.Peer.prefixList("pl-073555187c4e6ccf2"), ec2.Port.tcp(80));
 
@@ -174,7 +174,7 @@ export class ApplicationStack extends cdk.Stack {
      * Health check endpoint
      */
     service.connections.allowFrom(this.alb, ec2.Port.tcp(8081));
-    service.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
+    service.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
 
     const listener = this.alb.addListener("DemoAppAlbListener", {
       open: true,
@@ -202,7 +202,7 @@ export class ApplicationStack extends cdk.Stack {
       }
     });
 
-    this.alb.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
+    this.alb.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
     this.alb.connections.allowTo(service, ec2.Port.tcp(8081), "ALB Health Check");
     appUserCredentials.grantRead(service.taskDefinition.taskRole);
 

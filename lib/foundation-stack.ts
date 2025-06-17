@@ -5,12 +5,12 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
-import { ParamNames } from "./names";
+import { ParamNames as ParameterNames } from "./names";
 
 /**
  * Test
  */
-export interface FoundationStackProps extends cdk.StackProps {
+export interface FoundationStackProperties extends cdk.StackProps {
   /**
    * The name of the service and its associated database.
    */
@@ -31,9 +31,9 @@ export class FoundationStack extends cdk.Stack {
   public readonly appLogGroup: logs.ILogGroup;
   public readonly flywayLogGroup: logs.ILogGroup;
 
-  constructor(scope: Construct, id: string, props: FoundationStackProps) {
-    super(scope, id, props);
-    if (props.env === undefined) {
+  constructor(scope: Construct, id: string, properties: FoundationStackProperties) {
+    super(scope, id, properties);
+    if (properties.env === undefined) {
       throw new Error("props.env is undefined");
     }
 
@@ -46,12 +46,12 @@ export class FoundationStack extends cdk.Stack {
       rotationPeriod: cdk.Duration.days(90)
     });
     this.kmsKey.grantEncryptDecrypt(
-      new iam.ServicePrincipal(`logs.${props.env?.region}.amazonaws.com`)
+      new iam.ServicePrincipal(`logs.${properties.env?.region}.amazonaws.com`)
     );
 
     this.appLogGroup = new logs.LogGroup(this, "DemoAppLogGroup", {
       encryptionKey: this.kmsKey,
-      logGroupName: `/app/logs/${props.serviceName}`,
+      logGroupName: `/app/logs/${properties.serviceName}`,
       retention: logs.RetentionDays.ONE_WEEK,
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
@@ -65,25 +65,25 @@ export class FoundationStack extends cdk.Stack {
 
     new ssm.StringParameter(this, "AppLogGroup", {
       description: "Application Log Group ARN ",
-      parameterName: ParamNames.APP_LOG_GROUP,
+      parameterName: ParameterNames.APP_LOG_GROUP,
       stringValue: this.appLogGroup.logGroupArn
     });
 
     new ssm.StringParameter(this, "FlywayLogGroupParam", {
       description: "Flyway Custom Log Group ARN ",
-      parameterName: ParamNames.FLYWAY_LOG_GROUP,
+      parameterName: ParameterNames.FLYWAY_LOG_GROUP,
       stringValue: this.flywayLogGroup.logGroupArn
     });
 
     new ssm.StringParameter(this, "KmsKeyArnParam", {
       description: "DemoApp KMS Key ARN",
-      parameterName: ParamNames.KMS_ARN,
+      parameterName: ParameterNames.KMS_ARN,
       stringValue: this.kmsKey.keyArn
     });
 
     new ssm.StringParameter(this, "KmsKeyIdParam", {
       description: "DemoApp KMS Key ID",
-      parameterName: ParamNames.KMS_ID,
+      parameterName: ParameterNames.KMS_ID,
       stringValue: this.kmsKey.keyId
     });
   }

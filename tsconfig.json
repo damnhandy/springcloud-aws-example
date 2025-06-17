@@ -1,9 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2019",
-    "module": "CommonJS",
+    "target": "ES2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "outDir": "dist",
-    "lib": ["es2019", "dom"],
+    "lib": ["es2022", "dom"],
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -21,5 +22,5 @@
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["bin/**/*.ts", "lib/**/*.ts", "test/**/*.ts", "src/**/*.ts", "lambdas/**/*.ts"],
-  "exclude": ["cdk.out", "clients"]
+  "exclude": ["cdk.out", "clients", "eslint.config.mjs"]
 }

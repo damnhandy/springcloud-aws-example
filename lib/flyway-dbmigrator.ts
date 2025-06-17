@@ -1,5 +1,5 @@
-import * as cp from "child_process";
-import * as path from "path";
+import * as cp from "node:child_process";
+import * as path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -11,12 +11,12 @@ import * as sm from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { ParamNames } from "./names";
+import { ParamNames as ParameterNames } from "./names";
 
 /**
  *
  */
-export interface DBMigrationConstructProps extends cdk.StageProps {
+export interface DBMigrationConstructProperties extends cdk.StageProps {
   readonly vpc: ec2.IVpc;
   readonly vpcSubnets: ec2.SubnetSelection;
   readonly encryptionKey: kms.IKey;
@@ -35,18 +35,18 @@ export interface DBMigrationConstructProps extends cdk.StageProps {
 export class DBMigrationConstruct extends Construct {
   public readonly response: string;
   private resolvedSecretPlaceHolders?: { [key: string]: string };
-  constructor(scope: Construct, id: string, props: DBMigrationConstructProps) {
+  constructor(scope: Construct, id: string, properties: DBMigrationConstructProperties) {
     super(scope, id);
 
     const securityGroup = new ec2.SecurityGroup(this, `${id}DBMigratorSecurityGroup`, {
-      vpc: props.vpc,
+      vpc: properties.vpc,
       allowAllOutbound: false,
       allowAllIpv6Outbound: false
     });
     cdk.Tags.of(securityGroup).add("Name", `${id}DBMigratorSecurityGroup`);
 
     const functionDir = path.resolve(__dirname, "../flyway-lambda");
-    const fn = new lambda.SingletonFunction(this, `${id}DBMigratorFunction`, {
+    const function_ = new lambda.SingletonFunction(this, `${id}DBMigratorFunction`, {
       description: "Custom resource function to deploy schema migrations using Flyway",
       code: lambda.Code.fromAsset(functionDir, {
         bundling: {
@@ -75,17 +75,17 @@ export class DBMigrationConstruct extends Construct {
         }
       }),
       tracing: lambda.Tracing.ACTIVE,
-      logGroup: props.logGroup,
+      logGroup: properties.logGroup,
       loggingFormat: lambda.LoggingFormat.JSON,
       applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
       systemLogLevelV2: lambda.SystemLogLevel.INFO,
       handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
       runtime: lambda.Runtime.JAVA_17,
-      ephemeralStorageSize: props.ephemeralStorageSize || cdk.Size.mebibytes(512),
+      ephemeralStorageSize: properties.ephemeralStorageSize || cdk.Size.mebibytes(512),
       uuid: "CC2B87AC-AA48-4B81-B4E3-FE9C4AE28A2F",
-      vpc: props.vpc,
-      vpcSubnets: props.vpcSubnets,
-      environmentEncryption: props.encryptionKey,
+      vpc: properties.vpc,
+      vpcSubnets: properties.vpcSubnets,
+      environmentEncryption: properties.encryptionKey,
       memorySize: 512,
       timeout: cdk.Duration.minutes(10),
       paramsAndSecrets: lambda.ParamsAndSecretsLayerVersion.fromVersion(
@@ -111,39 +111,42 @@ export class DBMigrationConstruct extends Construct {
       "arn:aws:kms:us-east-1:226350727888:key/523fea9a-b4b0-4dc1-9519-d989b14cbc73"
     );
 
-    assetsKey.grantDecrypt(fn);
-    props.encryptionKey.grantEncryptDecrypt(fn);
-    props.masterPassword.grantRead(fn);
-    props.locations.grantRead(fn);
+    assetsKey.grantDecrypt(function_);
+    properties.encryptionKey.grantEncryptDecrypt(function_);
+    properties.masterPassword.grantRead(function_);
+    properties.locations.grantRead(function_);
 
     const endpointSecurityGroup = ec2.SecurityGroup.fromSecurityGroupId(
       this,
       "EndpointSecurityGroup",
-      ssm.StringParameter.valueForStringParameter(this, ParamNames.ENDPOINT_SG_ID)
+      ssm.StringParameter.valueForStringParameter(this, ParameterNames.ENDPOINT_SG_ID)
     );
-    fn.connections.allowTo(ec2.Peer.prefixList("pl-63a5400a"), ec2.Port.tcp(443));
-    fn.connections.allowTo(endpointSecurityGroup, ec2.Port.tcp(443));
-    fn.connections.allowTo(props.database, ec2.Port.tcp(props.database.clusterEndpoint.port));
-    if (props.secretPlaceHolders) {
+    function_.connections.allowTo(ec2.Peer.prefixList("pl-63a5400a"), ec2.Port.tcp(443));
+    function_.connections.allowTo(endpointSecurityGroup, ec2.Port.tcp(443));
+    function_.connections.allowTo(
+      properties.database,
+      ec2.Port.tcp(properties.database.clusterEndpoint.port)
+    );
+    if (properties.secretPlaceHolders) {
       this.resolvedSecretPlaceHolders = {};
-      for (const k in props.secretPlaceHolders) {
-        props.secretPlaceHolders[k].grantRead(fn);
-        this.resolvedSecretPlaceHolders[k] = props.secretPlaceHolders[k].secretName;
+      for (const k in properties.secretPlaceHolders) {
+        properties.secretPlaceHolders[k].grantRead(function_);
+        this.resolvedSecretPlaceHolders[k] = properties.secretPlaceHolders[k].secretName;
       }
     }
     const cr = new cdk.CustomResource(this, `${id}DBMigrator`, {
       resourceType: "Custom::DBMigrator",
-      serviceToken: fn.functionArn,
+      serviceToken: function_.functionArn,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       properties: {
-        masterSecret: props.masterPassword.secretName,
-        locations: props.locations.s3ObjectUrl,
+        masterSecret: properties.masterPassword.secretName,
+        locations: properties.locations.s3ObjectUrl,
         mixed: true,
-        placeHolders: props.placeholders,
+        placeHolders: properties.placeholders,
         secretPlaceHolders: this.resolvedSecretPlaceHolders
       }
     });
-    cr.node.addDependency(props.database);
+    cr.node.addDependency(properties.database);
     this.response = cr.getAtt("Response").toString();
   }
 }

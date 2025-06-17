@@ -7,8 +7,8 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { ParamNames } from "./names";
-export interface DatabaseStackProps extends cdk.StackProps {
+import { ParamNames as ParameterNames } from "./names";
+export interface DatabaseStackProperties extends cdk.StackProps {
   readonly vpc: ec2.IVpc;
   readonly artifactsBucket: s3.IBucket;
   readonly serviceName: string;
@@ -25,28 +25,28 @@ export class DatabaseStack extends cdk.Stack {
   artifactsBucket: s3.IBucket;
   vpc: ec2.IVpc;
 
-  constructor(scope: Construct, id: string, props: DatabaseStackProps) {
-    super(scope, id, props);
-    if (props.env === undefined) {
+  constructor(scope: Construct, id: string, properties: DatabaseStackProperties) {
+    super(scope, id, properties);
+    if (properties.env === undefined) {
       throw new Error("props.env is undefined");
     }
-    this.artifactsBucket = props.artifactsBucket;
+    this.artifactsBucket = properties.artifactsBucket;
 
-    this.vpc = props.vpc;
+    this.vpc = properties.vpc;
     this.kmsKey = kms.Key.fromKeyArn(
       this,
       "KmsKeyRef",
-      ssm.StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
+      ssm.StringParameter.valueForStringParameter(this, ParameterNames.KMS_ARN)
     );
 
     this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
-      secretName: ParamNames.PG_ADMIN_SECRET,
+      secretName: ParameterNames.PG_ADMIN_SECRET,
       username: "dbadmin",
       encryptionKey: this.kmsKey
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, "AppuserCreds", {
-      secretName: ParamNames.DEMO_APP_USER_SECRET,
+      secretName: ParameterNames.DEMO_APP_USER_SECRET,
       username: "appuser",
       encryptionKey: this.kmsKey
     });
@@ -59,14 +59,14 @@ export class DatabaseStack extends cdk.Stack {
         ssl: "1",
         // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         ssl_min_protocol_version: "TLSv1.2",
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
+
+        // eslint-disable-next-line @typescript-eslint/naming-convention
         "rds.force_ssl": "1"
       }
     });
 
     const securityGroup = new ec2.SecurityGroup(this, "DBSecurityGroup", {
-      vpc: props.vpc,
+      vpc: properties.vpc,
       allowAllOutbound: false,
       description: "Security group for Aurora Postgres",
       disableInlineRules: true,
@@ -75,7 +75,7 @@ export class DatabaseStack extends cdk.Stack {
 
     this.dbCluster = new rds.DatabaseCluster(this, "DBCluster", {
       networkType: rds.NetworkType.DUAL,
-      defaultDatabaseName: props.serviceName,
+      defaultDatabaseName: properties.serviceName,
       parameterGroup: parameterGroup,
       cloudwatchLogsExports: ["postgresql"],
       enableDataApi: true,
@@ -108,7 +108,7 @@ export class DatabaseStack extends cdk.Stack {
     //   excludeCharacters: " %+:;{}"
     // });
     this.appUserCreds.attach(this.dbCluster);
-    this.dbCluster.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
+    this.dbCluster.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
 
     // new secretsmanager.RotationSchedule(this, "PGAppUserRotationSchedule", {
     //   secret: appuserAttachment,
@@ -126,32 +126,23 @@ export class DatabaseStack extends cdk.Stack {
     // });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
-      parameterName: ParamNames.PG_SG_ID,
+      parameterName: ParameterNames.PG_SG_ID,
       stringValue: this.dbCluster.connections.securityGroups[0].securityGroupId
     });
 
     new ssm.StringParameter(this, "HostNameSSMParam", {
-      parameterName: ParamNames.JDBC_HOSTNAME,
+      parameterName: ParameterNames.JDBC_HOSTNAME,
       stringValue: this.dbCluster.clusterEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "ReaderHostNameSSMParam", {
-      parameterName: ParamNames.JDBC_READER_HOSTNAME,
+      parameterName: ParameterNames.JDBC_READER_HOSTNAME,
       stringValue: this.dbCluster.clusterReadEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "PortSSMParam", {
-      parameterName: ParamNames.JDBC_PORT,
+      parameterName: ParameterNames.JDBC_PORT,
       stringValue: `${this.dbCluster.clusterEndpoint.port}`
     });
-
-    this.dbUrl = new ssm.StringParameter(this, "JdbcUrlSSMParam", {
-      parameterName: ParamNames.JDBC_URL,
-      stringValue: buildJdbcUrl(this.dbCluster)
-    });
-
-    function buildJdbcUrl(dbCluster: rds.IDatabaseCluster): string {
-      return `jdbc:${dbCluster.engine?.engineType}://${dbCluster.clusterEndpoint.hostname}:${dbCluster.clusterEndpoint.port}/${props.serviceName}`;
-    }
   }
 }

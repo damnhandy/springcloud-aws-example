@@ -1,4 +1,4 @@
-export interface AppConfigOpts {
+export interface AppConfigOptions {
   readonly context: string;
   readonly name: string;
 }
@@ -98,15 +98,15 @@ export class ParamNames {
     name: "jdbc/reader-hostname"
   });
 
-  static envPath(opts: AppConfigOpts): string {
-    return `/env/${opts.context}/${opts.name}`;
+  static envPath(options: AppConfigOptions): string {
+    return `/env/${options.context}/${options.name}`;
   }
 
-  static appConfigPath(opts: AppConfigOpts): string {
-    return `/config/${opts.context}/${opts.name}`;
+  static appConfigPath(options: AppConfigOptions): string {
+    return `/config/${options.context}/${options.name}`;
   }
 
-  static appSecretPath(opts: AppConfigOpts): string {
-    return `/secret/${opts.context}/${opts.name}`;
+  static appSecretPath(options: AppConfigOptions): string {
+    return `/secret/${options.context}/${options.name}`;
   }
 }

@@ -1,11 +1,10 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as iam from "aws-cdk-lib/aws-iam";
 
 import { Construct } from "constructs";
 
-export interface EC2TesterStackProps extends cdk.StackProps {
+export interface EC2TesterStackProperties extends cdk.StackProps {
   readonly vpc: ec2.IVpc;
   readonly endpointSecurityGroup: ec2.ISecurityGroup;
 }
@@ -13,10 +12,10 @@ export interface EC2TesterStackProps extends cdk.StackProps {
  * This stack is used to test the shared VPC. It creates an EC2 instance in the infra VPC only in experimental deployments only.
  */
 export class EC2TesterStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props: EC2TesterStackProps) {
-    super(scope, id, props);
+  constructor(scope: Construct, id: string, properties: EC2TesterStackProperties) {
+    super(scope, id, properties);
 
-    const vpc = props.vpc;
+    const vpc = properties.vpc;
 
     const role = new iam.Role(this, "InstanceRoleWithSsmPolicy", {
       assumedBy: new iam.ServicePrincipal("ec2.amazonaws.com")
@@ -48,7 +47,7 @@ export class EC2TesterStack extends cdk.Stack {
       securityGroup: sg,
       userDataCausesReplacement: true
     });
-    instance.connections.allowFrom(props.endpointSecurityGroup, ec2.Port.tcp(443));
-    instance.connections.allowTo(props.endpointSecurityGroup, ec2.Port.tcp(443));
+    instance.connections.allowFrom(properties.endpointSecurityGroup, ec2.Port.tcp(443));
+    instance.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
   }
 }
