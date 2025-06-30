@@ -1,4 +1,4 @@
-import * as path from "path";
+import path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -8,7 +8,7 @@ import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 
 import { Construct } from "constructs";
-import { DBMigrationConstruct } from "./flyway-dbmigrator";
+import { DBMigrationConstruct } from "./flyway-dbmigrator.js";
 
 export interface SqlStackProps extends cdk.StackProps {
   readonly vpc: ec2.IVpc;
@@ -16,8 +16,8 @@ export interface SqlStackProps extends cdk.StackProps {
   readonly dbMasterCreds: secretsmanager.ISecret;
   readonly dbCluster: rds.DatabaseCluster;
   readonly ephemeralStorageSize?: cdk.Size;
-  readonly placeholders?: { [key: string]: string };
-  readonly secretPlaceHolders?: { [key: string]: secretsmanager.ISecret };
+  readonly placeholders?: Record<string, string>;
+  readonly secretPlaceHolders?: Record<string, secretsmanager.ISecret>;
   readonly logGroup: logs.ILogGroup;
 }
 
@@ -39,7 +39,7 @@ export class SqlStack extends cdk.Stack {
       encryptionKey: props.encryptionKey,
       locations: new s3assets.Asset(this, `DataMigrationAssets2`, {
         deployTime: false,
-        path: path.resolve(__dirname, "../data-migration/sql")
+        path: path.resolve(import.meta.dirname, "../data-migration/sql")
       }),
       placeholders: props.placeholders,
       secretPlaceHolders: props.secretPlaceHolders,

@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import * as path from "node:path";
+import path from "node:path";
 import {
   BootstrapRole,
   FileStagingLocation,
@@ -422,7 +422,7 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     // Create image publishing role if it doesn't exist
     this.ensureImageRole();
 
-    const repoName = generateRepoName(`${this.appId}/${asset.assetName}`);
+    const repoName = this.generateRepoName(`${this.appId}/${asset.assetName}`);
     if (this.stagingRepos[asset.assetName] === undefined) {
       this.stagingRepos[asset.assetName] = new ecr.Repository(this, repoName, {
         repositoryName: repoName,
@@ -459,10 +459,10 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
       }
     }
     return repoName;
+  }
 
-    function generateRepoName(name: string): string {
-      return name.toLocaleLowerCase().replace(".", "-");
-    }
+  private generateRepoName(name: string): string {
+    return name.toLocaleLowerCase().replace(".", "-");
   }
 
   public addFile(asset: FileAssetSource): FileStagingLocation {

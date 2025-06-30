@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
@@ -15,7 +15,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
 
-import { ParamNames as ParameterNames } from "./names";
+import { ParamNames } from "./names.js";
 
 /**
  *
@@ -49,18 +49,18 @@ export class ApplicationStack extends cdk.Stack {
     this.kmsKey = kms.Key.fromKeyArn(
       this,
       "KmsKeyRef",
-      ssm.StringParameter.valueForStringParameter(this, ParameterNames.KMS_ARN)
+      ssm.StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
     );
 
     const appUserCredentials = secretsmanager.Secret.fromSecretNameV2(
       this,
       "AppUserSecret",
-      ParameterNames.DEMO_APP_USER_SECRET
+      ParamNames.DEMO_APP_USER_SECRET
     );
 
     const cluster = new ecs.Cluster(this, "DemoCluster", {
       vpc: this.vpc,
-      containerInsights: true
+      containerInsightsV2: ecs.ContainerInsights.ENABLED
     });
 
     const taskDefinition = new ecs.FargateTaskDefinition(this, "DemoAppTaskDef", {
@@ -70,7 +70,7 @@ export class ApplicationStack extends cdk.Stack {
 
     const container = taskDefinition.addContainer("DemoAppContainer", {
       containerName: `${properties.serviceName}-container`,
-      image: ecs.ContainerImage.fromAsset(path.resolve(__dirname, "../springboot-app"), {
+      image: ecs.ContainerImage.fromAsset(path.resolve(import.meta.dirname, "../springboot-app"), {
         assetName: "springboot-app"
       }),
       logging: ecs.LogDriver.awsLogs({

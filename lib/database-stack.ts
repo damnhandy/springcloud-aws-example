@@ -7,7 +7,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { ParamNames as ParameterNames } from "./names";
+import { ParamNames } from "./names.js";
 export interface DatabaseStackProperties extends cdk.StackProps {
   readonly vpc: ec2.IVpc;
   readonly artifactsBucket: s3.IBucket;
@@ -36,17 +36,17 @@ export class DatabaseStack extends cdk.Stack {
     this.kmsKey = kms.Key.fromKeyArn(
       this,
       "KmsKeyRef",
-      ssm.StringParameter.valueForStringParameter(this, ParameterNames.KMS_ARN)
+      ssm.StringParameter.valueForStringParameter(this, ParamNames.KMS_ARN)
     );
 
     this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
-      secretName: ParameterNames.PG_ADMIN_SECRET,
+      secretName: ParamNames.PG_ADMIN_SECRET,
       username: "dbadmin",
       encryptionKey: this.kmsKey
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, "AppuserCreds", {
-      secretName: ParameterNames.DEMO_APP_USER_SECRET,
+      secretName: ParamNames.DEMO_APP_USER_SECRET,
       username: "appuser",
       encryptionKey: this.kmsKey
     });
@@ -57,10 +57,7 @@ export class DatabaseStack extends cdk.Stack {
       }),
       parameters: {
         ssl: "1",
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         ssl_min_protocol_version: "TLSv1.2",
-
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         "rds.force_ssl": "1"
       }
     });
@@ -126,22 +123,22 @@ export class DatabaseStack extends cdk.Stack {
     // });
 
     new ssm.StringParameter(this, "SecurityGroupId", {
-      parameterName: ParameterNames.PG_SG_ID,
+      parameterName: ParamNames.PG_SG_ID,
       stringValue: this.dbCluster.connections.securityGroups[0].securityGroupId
     });
 
     new ssm.StringParameter(this, "HostNameSSMParam", {
-      parameterName: ParameterNames.JDBC_HOSTNAME,
+      parameterName: ParamNames.JDBC_HOSTNAME,
       stringValue: this.dbCluster.clusterEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "ReaderHostNameSSMParam", {
-      parameterName: ParameterNames.JDBC_READER_HOSTNAME,
+      parameterName: ParamNames.JDBC_READER_HOSTNAME,
       stringValue: this.dbCluster.clusterReadEndpoint.hostname
     });
 
     new ssm.StringParameter(this, "PortSSMParam", {
-      parameterName: ParameterNames.JDBC_PORT,
+      parameterName: ParamNames.JDBC_PORT,
       stringValue: `${this.dbCluster.clusterEndpoint.port}`
     });
   }

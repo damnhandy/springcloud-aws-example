@@ -1,33 +1,64 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
+import { globalIgnores } from "eslint/config";
 import prettierConfig from "eslint-config-prettier";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
 import eslintPluginImport from "eslint-plugin-import";
 
-import globals from "globals";
-
 export default tseslint.config(
+  globalIgnores([
+    ".github/*",
+    ".husky/*",
+    ".idea/*",
+    ".next/*",
+    ".vscode/*",
+    "coverage/*",
+    "dist/*",
+    "node_modules/*",
+    "**/.idea/*",
+    "**/cdk.out/*",
+    "cdk.out/"
+  ]),
   eslint.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.stylisticTypeChecked,
+  eslintPluginUnicorn.configs.recommended,
   prettierConfig,
   {
-    plugins: {
-      unicorn: eslintPluginUnicorn,
-      import: eslintPluginImport
-    },
     languageOptions: {
-      globals: globals.builtin,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname
+      }
+    },
+    ignores: ["**/*.{js,mjs}"],
+    plugins: {
+      import: eslintPluginImport
+    },
+    settings: {
+      "import/parsers": {
+        "@typescript-eslint/parser": [".ts", ".tsx"]
+      },
+      "import/resolver": {
+        node: {
+          paths: ["lib", "bin", "test", "config"]
+        },
+        typescript: {
+          project: "./tsconfig.json"
+        }
       }
     },
     rules: {
       "max-lines": ["error", { max: 1000, skipComments: true, skipBlankLines: true }],
       "prefer-template": ["error"],
       curly: ["error"],
-      camelcase: ["error"],
-      "@typescript-eslint/no-require-imports": ["error"],
+      "unicorn/filename-case": [
+        "error",
+        {
+          case: "kebabCase"
+        }
+      ],
+      "unicorn/prevent-abbreviations": ["off"],
       "import/no-extraneous-dependencies": [
         "error",
         {
@@ -43,19 +74,20 @@ export default tseslint.config(
           groups: ["builtin", "external"],
           alphabetize: {
             order: "asc",
-            caseInsensitive: true
+            caseInsensitive: false
           }
         }
       ],
       "no-duplicate-imports": ["error"],
       "no-shadow": ["off"],
-      "@typescript-eslint/no-shadow": ["error"],
       "key-spacing": ["error"],
       "no-multiple-empty-lines": ["error"],
-      "@typescript-eslint/no-floating-promises": ["error"],
       "no-return-await": ["error"],
       "dot-notation": ["error"],
       "no-bitwise": ["error"],
+      "@typescript-eslint/no-require-imports": ["error"],
+      "@typescript-eslint/no-floating-promises": ["error"],
+      "@typescript-eslint/no-shadow": ["error"],
       "@typescript-eslint/member-ordering": [
         "error",
         {
@@ -72,32 +104,9 @@ export default tseslint.config(
           ]
         }
       ],
-      "unicorn/filename-case": [
-        "error",
-        {
-          case: "kebabCase"
-        }
-      ],
+
       "@typescript-eslint/naming-convention": [
         "error",
-        {
-          selector: "default",
-          format: ["camelCase", "UPPER_CASE", "PascalCase"],
-          leadingUnderscore: "allow",
-          trailingUnderscore: "allow"
-        },
-        {
-          selector: "variable",
-          format: ["camelCase", "UPPER_CASE"],
-          leadingUnderscore: "allow",
-          trailingUnderscore: "allow"
-        },
-        {
-          selector: "objectLiteralProperty",
-          format: ["camelCase", "UPPER_CASE", "PascalCase"],
-          leadingUnderscore: "allow",
-          trailingUnderscore: "allow"
-        },
         {
           selector: "classProperty",
           format: ["camelCase", "UPPER_CASE"],
@@ -135,19 +144,11 @@ export default tseslint.config(
           format: ["PascalCase"]
         }
       ]
-    },
-    settings: {
-      "import/parsers": {
-        "@typescript-eslint/parser": [".ts", ".tsx"]
-      },
-      "import/resolver": {
-        node: {
-          paths: ["lib", "bin", "test", "config"]
-        },
-        typescript: {
-          project: "./tsconfig.json"
-        }
-      }
     }
+  },
+  // Disable type checked rules for JavaScript files
+  {
+    files: ["**/*.{js,mjs}"],
+    extends: [tseslint.configs.disableTypeChecked]
   }
 );

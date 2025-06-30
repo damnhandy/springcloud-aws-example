@@ -5,7 +5,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
-import { ParamNames as ParameterNames } from "./names";
+import { ParamNames } from "./names.js";
 
 /**
  * Test
@@ -65,25 +65,25 @@ export class FoundationStack extends cdk.Stack {
 
     new ssm.StringParameter(this, "AppLogGroup", {
       description: "Application Log Group ARN ",
-      parameterName: ParameterNames.APP_LOG_GROUP,
+      parameterName: ParamNames.APP_LOG_GROUP,
       stringValue: this.appLogGroup.logGroupArn
     });
 
     new ssm.StringParameter(this, "FlywayLogGroupParam", {
       description: "Flyway Custom Log Group ARN ",
-      parameterName: ParameterNames.FLYWAY_LOG_GROUP,
+      parameterName: ParamNames.FLYWAY_LOG_GROUP,
       stringValue: this.flywayLogGroup.logGroupArn
     });
 
     new ssm.StringParameter(this, "KmsKeyArnParam", {
       description: "DemoApp KMS Key ARN",
-      parameterName: ParameterNames.KMS_ARN,
+      parameterName: ParamNames.KMS_ARN,
       stringValue: this.kmsKey.keyArn
     });
 
     new ssm.StringParameter(this, "KmsKeyIdParam", {
       description: "DemoApp KMS Key ID",
-      parameterName: ParameterNames.KMS_ID,
+      parameterName: ParamNames.KMS_ID,
       stringValue: this.kmsKey.keyId
     });
   }

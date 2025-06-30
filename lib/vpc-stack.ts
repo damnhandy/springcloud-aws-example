@@ -5,7 +5,7 @@ import * as route53profiles from "aws-cdk-lib/aws-route53profiles";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
-import { ParamNames as ParameterNames } from "./names";
+import { ParamNames } from "./names.js";
 
 export interface VpcStackProperties extends cdk.StackProps {
   readonly ipv4Cidr: string;
@@ -61,7 +61,7 @@ export class VpcStack extends cdk.Stack {
 
     new ssm.StringParameter(this, "EndpointSecurityGroupParam", {
       stringValue: this.endpointSecurityGroup.securityGroupId,
-      parameterName: ParameterNames.ENDPOINT_SG_ID,
+      parameterName: ParamNames.ENDPOINT_SG_ID,
       description: "Security group ID for VPC endpoints"
     });
 

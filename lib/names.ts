@@ -48,32 +48,32 @@ export class ParamNames {
     name: `artifacts/name`
   });
 
-  public static readonly APP_LOG_GROUP = ParamNames.envPath({
+  public static readonly APP_LOG_GROUP: string = ParamNames.envPath({
     context: "logs",
     name: `application/${ParamNames.APP_NAME}`
   });
 
-  public static readonly FLYWAY_LOG_GROUP = ParamNames.envPath({
+  public static readonly FLYWAY_LOG_GROUP: string = ParamNames.envPath({
     context: "logs",
     name: `application/flyway-custom-resource`
   });
 
-  public static readonly PG_SG_ID = ParamNames.envPath({
+  public static readonly PG_SG_ID: string = ParamNames.envPath({
     context: "security-groups",
     name: `postgres/${ParamNames.APP_NAME}/id`
   });
 
-  public static readonly ENDPOINT_SG_ID = ParamNames.envPath({
+  public static readonly ENDPOINT_SG_ID: string = ParamNames.envPath({
     context: "security-groups",
     name: `postgres/vpc-endpoints/id`
   });
 
-  public static readonly PG_ADMIN_SECRET = ParamNames.appSecretPath({
+  public static readonly PG_ADMIN_SECRET: string = ParamNames.appSecretPath({
     context: ParamNames.APP_NAME,
     name: "dbadmin"
   });
 
-  public static readonly DEMO_APP_USER_SECRET = ParamNames.appSecretPath({
+  public static readonly DEMO_APP_USER_SECRET: string = ParamNames.appSecretPath({
     context: ParamNames.APP_NAME,
     name: "appuser2"
   });

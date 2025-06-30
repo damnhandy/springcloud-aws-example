@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import "source-map-support/register";
-import * as cp from "child_process";
+import cp from "node:child_process";
 import { AppStagingSynthesizer } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as cdk from "aws-cdk-lib";
-import { PrototypeStagingStack } from "../lib/app-staging-stack";
-import { ApplicationServiceStack } from "../lib/application-service-stack";
-import { ApplicationStack } from "../lib/application-stack";
-import { DatabaseStack } from "../lib/database-stack";
-import { EC2TesterStack } from "../lib/ec2-host";
-import { FoundationStack } from "../lib/foundation-stack";
-import { SqlStack } from "../lib/sql-stack";
-import { VpcStack } from "../lib/vpc-stack";
+import { PrototypeStagingStack } from "../lib/app-staging-stack.js";
+import { ApplicationServiceStack } from "../lib/application-service-stack.js";
+import { ApplicationStack } from "../lib/application-stack.js";
+import { DatabaseStack } from "../lib/database-stack.js";
+import { EC2TesterStack } from "../lib/ec2-host.js";
+import { FoundationStack } from "../lib/foundation-stack.js";
+import { SqlStack } from "../lib/sql-stack.js";
+import { VpcStack } from "../lib/vpc-stack.js";
 // Note that this value Should be the same as the value defined in spring.application.name
 const serviceName = "demoapp";
 
@@ -31,7 +31,7 @@ const app = new cdk.App({
   })
 });
 
-const serviceNetworkArn = app.node.tryGetContext("serviceNetworkArn");
+const serviceNetworkArn = app.node.tryGetContext("serviceNetworkArn") as string;
 
 const env = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
@@ -73,11 +73,9 @@ const sqlStack = new SqlStack(app, "SqlStack", {
   encryptionKey: foundationStack.kmsKey,
   dbMasterCreds: dbStack.dbAdminCreds,
   placeholders: {
-    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
     appuser_username: "appuser"
   },
   secretPlaceHolders: {
-    // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
     appuser_secret: dbStack.appUserCreds
   }
 });

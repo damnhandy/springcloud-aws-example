@@ -4,12 +4,13 @@
   "bin": {
     "infrastructure": "bin/springboot-app.js"
   },
+  "type": "module",
   "scripts": {
     "build": "tsc",
     "cdk": "cdk",
     "deploy": "npx cdk deploy --all --require-approval never",
-    "lint": "NODE_OPTIONS=\"--experimental-strip-types\" eslint . --ext .ts",
-    "lint-and-fix": "NODE_OPTIONS=\"--experimental-strip-types\"  eslint . --ext .ts --fix",
+    "lint": "eslint . --ext .ts",
+    "lint-and-fix": "eslint . --ext .ts --fix",
     "prepare": "husky install",
     "prettier-format": "prettier --write .",
     "prettier-watch": "onchange '**/*.*' -- prettier --write {{changed}}",
@@ -26,8 +27,12 @@
     "constructs": "^10",
     "source-map-support": "^0.5.16"
   },
+  "prettier": "@polysync/prettier-config",
   "devDependencies": {
     "@eslint/js": "^9",
+    "@polysync/eslint-config": "file:../polysync/polysync-eslint-config-1.0.0.tgz",
+    "@polysync/prettier-config": "file:../polysync/polysync-prettier-config-1.0.0.tgz",
+    "@polysync/ts-config": "file:../polysync/polysync-ts-config-1.0.0.tgz",
     "@prettier/plugin-ruby": "^1.6.0",
     "@types/aws-lambda": "ts5.5",
     "@types/jest": "ts5.5",

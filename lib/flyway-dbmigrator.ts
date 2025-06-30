@@ -1,5 +1,5 @@
 import * as cp from "node:child_process";
-import * as path from "node:path";
+import path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -11,7 +11,7 @@ import * as sm from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 
 import { Construct } from "constructs";
-import { ParamNames as ParameterNames } from "./names";
+import { ParamNames as ParameterNames } from "./names.js";
 
 /**
  *
@@ -24,8 +24,8 @@ export interface DBMigrationConstructProperties extends cdk.StageProps {
   readonly database: rds.DatabaseCluster;
   readonly masterPassword: sm.ISecret;
   readonly ephemeralStorageSize?: cdk.Size;
-  readonly placeholders?: { [key: string]: string };
-  readonly secretPlaceHolders?: { [key: string]: sm.ISecret };
+  readonly placeholders?: Record<string, string>;
+  readonly secretPlaceHolders?: Record<string, sm.ISecret>;
   readonly logGroup: logs.ILogGroup;
 }
 
@@ -34,7 +34,7 @@ export interface DBMigrationConstructProperties extends cdk.StageProps {
  */
 export class DBMigrationConstruct extends Construct {
   public readonly response: string;
-  private resolvedSecretPlaceHolders?: { [key: string]: string };
+  private resolvedSecretPlaceHolders?: Record<string, string>;
   constructor(scope: Construct, id: string, properties: DBMigrationConstructProperties) {
     super(scope, id);
 
@@ -45,16 +45,16 @@ export class DBMigrationConstruct extends Construct {
     });
     cdk.Tags.of(securityGroup).add("Name", `${id}DBMigratorSecurityGroup`);
 
-    const functionDir = path.resolve(__dirname, "../flyway-lambda");
+    const functionDir = path.resolve(import.meta.dirname, "../flyway-lambda");
     const function_ = new lambda.SingletonFunction(this, `${id}DBMigratorFunction`, {
       description: "Custom resource function to deploy schema migrations using Flyway",
       code: lambda.Code.fromAsset(functionDir, {
         bundling: {
-          image: lambda.Runtime.JAVA_17.bundlingImage,
+          image: lambda.Runtime.JAVA_21.bundlingImage,
           command: [
             "/bin/sh",
             "-c",
-            "./gradlew build --no-daemon && cp /asset-input/build/distributions/flyway-lambda.zip /asset-output/"
+            "./gradlew build -x test --no-daemon && cp /asset-input/build/distributions/flyway-lambda.zip /asset-output/"
           ],
           outputType: cdk.BundlingOutput.ARCHIVED,
           local: {
@@ -65,7 +65,7 @@ export class DBMigrationConstruct extends Construct {
                 return false;
               }
 
-              cp.execSync(`cd ${functionDir} && ./gradlew clean build`);
+              cp.execSync(`cd ${functionDir} && ./gradlew clean build -x test --no-daemon`);
               cp.execSync(
                 `cp ${functionDir}/build/distributions/flyway-lambda.zip ${path.join(outputDir)}`
               );
@@ -81,7 +81,7 @@ export class DBMigrationConstruct extends Construct {
       systemLogLevelV2: lambda.SystemLogLevel.INFO,
       handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
       runtime: lambda.Runtime.JAVA_17,
-      ephemeralStorageSize: properties.ephemeralStorageSize || cdk.Size.mebibytes(512),
+      ephemeralStorageSize: properties.ephemeralStorageSize ?? cdk.Size.mebibytes(512),
       uuid: "CC2B87AC-AA48-4B81-B4E3-FE9C4AE28A2F",
       vpc: properties.vpc,
       vpcSubnets: properties.vpcSubnets,
