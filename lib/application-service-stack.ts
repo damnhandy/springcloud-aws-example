@@ -1,6 +1,5 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
-
 import * as lb from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -10,12 +9,12 @@ import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
 
 export interface ApplicationServiceStackProperties extends cdk.StackProps {
-  readonly serviceName: string;
-  readonly vpc: ec2.IVpc;
   readonly kmsKey: kms.IKey;
-  readonly serviceNetworkArn: string;
-  readonly privateHostedZone: route53.IPrivateHostedZone;
   readonly loadBalancer: lb.IApplicationLoadBalancer;
+  readonly privateHostedZone: route53.IPrivateHostedZone;
+  readonly serviceName: string;
+  readonly serviceNetworkArn: string;
+  readonly vpc: ec2.IVpc;
 }
 
 export class ApplicationServiceStack extends cdk.Stack {
@@ -25,37 +24,37 @@ export class ApplicationServiceStack extends cdk.Stack {
     const internalName = `${properties.serviceName}.apps.gs.internal`;
 
     const demoAppService = new vpclattice.CfnService(this, "DemoAppServiceInterface", {
-      name: `${properties.serviceName}-service-interface`,
       authType: "AWS_IAM",
-      customDomainName: `${properties.serviceName}.apps.gs.internal`
+      customDomainName: `${properties.serviceName}.apps.gs.internal`,
+      name: `${properties.serviceName}-service-interface`
     });
 
     new route53.RecordSet(this, "DemoAppCNameRecord", {
-      zone: properties.privateHostedZone,
       recordName: internalName,
       recordType: route53.RecordType.CNAME,
-      target: route53.RecordTarget.fromValues(demoAppService.attrDnsEntryDomainName)
+      target: route53.RecordTarget.fromValues(demoAppService.attrDnsEntryDomainName),
+      zone: properties.privateHostedZone
     });
 
     new vpclattice.CfnAuthPolicy(this, "DemoAppServiceInterfaceAuthPolicy", {
-      resourceIdentifier: demoAppService.attrArn,
       policy: new iam.PolicyDocument({
         statements: [
           new iam.PolicyStatement({
             actions: ["vpc-lattice-svcs:Invoke", "vpc-lattice-svcs:Connect"],
-            resources: [`${demoAppService.attrArn}/*`],
+            effect: iam.Effect.ALLOW,
             principals: [new iam.AnyPrincipal()],
-            effect: iam.Effect.ALLOW
+            resources: [`${demoAppService.attrArn}/*`]
           })
         ]
-      })
+      }),
+      resourceIdentifier: demoAppService.attrArn
     });
 
     const serviceLogGroup = new logs.LogGroup(this, "DemoAppServiceInterfaceLogGroup", {
       encryptionKey: properties.kmsKey,
       logGroupName: `/app/lattice/service/${demoAppService.name}`,
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_WEEK
     });
 
     new vpclattice.CfnAccessLogSubscription(this, "DemoAppServiceInterfaceAccessLogSubscription", {
@@ -67,19 +66,19 @@ export class ApplicationServiceStack extends cdk.Stack {
       this,
       "DemoAppServiceInterfaceTargetGroup",
       {
-        type: "ALB",
+        config: {
+          port: 80,
+          protocol: "HTTP",
+          protocolVersion: "HTTP1",
+          vpcIdentifier: properties.vpc.vpcId
+        },
         targets: [
           {
             id: properties.loadBalancer.loadBalancerArn,
             port: 80
           }
         ],
-        config: {
-          port: 80,
-          protocol: "HTTP",
-          protocolVersion: "HTTP1",
-          vpcIdentifier: properties.vpc.vpcId
-        }
+        type: "ALB"
       }
     );
 
@@ -93,8 +92,8 @@ export class ApplicationServiceStack extends cdk.Stack {
           ]
         }
       },
-      protocol: "HTTP",
       port: 80,
+      protocol: "HTTP",
       serviceIdentifier: demoAppService.attrArn
     });
 

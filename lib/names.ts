@@ -6,36 +6,14 @@ export interface AppConfigOptions {
 export class ParamNames {
   public static readonly APP_NAME = "demoapp";
 
-  public static readonly SHARED_CONTEXT = "shared";
-
   public static readonly APP_ECR_REPO_NAME = ParamNames.envPath({
     context: "ecr",
     name: `apps/${ParamNames.APP_NAME}`
   });
 
-  public static readonly FLYWAY_ECR_REPO_NAME = ParamNames.envPath({
-    context: "ecr",
-    name: "ci/flyway"
-  });
-
-  public static readonly FLYWAY_PROJECT_NAME = ParamNames.envPath({
-    context: "codebuild",
-    name: "flyway/name"
-  });
-
-  public static readonly VPC_ID = ParamNames.envPath({
-    context: "vpc",
-    name: `${ParamNames.APP_NAME}/id`
-  });
-
-  public static readonly KMS_ARN = ParamNames.envPath({
-    context: "kms",
-    name: `${ParamNames.APP_NAME}/arn`
-  });
-
-  public static readonly KMS_ID = ParamNames.envPath({
-    context: "kms",
-    name: `${ParamNames.APP_NAME}/id`
+  public static readonly APP_LOG_GROUP: string = ParamNames.envPath({
+    context: "logs",
+    name: `application/${ParamNames.APP_NAME}`
   });
 
   public static readonly ARTIFACTS_BUCKET_ARN = ParamNames.envPath({
@@ -48,19 +26,9 @@ export class ParamNames {
     name: `artifacts/name`
   });
 
-  public static readonly APP_LOG_GROUP: string = ParamNames.envPath({
-    context: "logs",
-    name: `application/${ParamNames.APP_NAME}`
-  });
-
-  public static readonly FLYWAY_LOG_GROUP: string = ParamNames.envPath({
-    context: "logs",
-    name: `application/flyway-custom-resource`
-  });
-
-  public static readonly PG_SG_ID: string = ParamNames.envPath({
-    context: "security-groups",
-    name: `postgres/${ParamNames.APP_NAME}/id`
+  public static readonly DEMO_APP_USER_SECRET: string = ParamNames.appSecretPath({
+    context: ParamNames.APP_NAME,
+    name: "appuser2"
   });
 
   public static readonly ENDPOINT_SG_ID: string = ParamNames.envPath({
@@ -68,19 +36,26 @@ export class ParamNames {
     name: `postgres/vpc-endpoints/id`
   });
 
-  public static readonly PG_ADMIN_SECRET: string = ParamNames.appSecretPath({
-    context: ParamNames.APP_NAME,
-    name: "dbadmin"
+  public static readonly FLYWAY_ECR_REPO_NAME = ParamNames.envPath({
+    context: "ecr",
+    name: "ci/flyway"
   });
 
-  public static readonly DEMO_APP_USER_SECRET: string = ParamNames.appSecretPath({
-    context: ParamNames.APP_NAME,
-    name: "appuser2"
+  public static readonly FLYWAY_LOG_GROUP: string = ParamNames.envPath({
+    context: "logs",
+    name: `application/flyway-custom-resource`
   });
 
-  public static readonly JDBC_URL = ParamNames.appConfigPath({
+  public static readonly FLYWAY_PROJECT_NAME = ParamNames.envPath({
+    context: "codebuild",
+    name: "flyway/name"
+  });
+
+  public static readonly SHARED_CONTEXT = "shared";
+
+  public static readonly JDBC_HOSTNAME = ParamNames.appConfigPath({
     context: ParamNames.SHARED_CONTEXT,
-    name: "jdbc/url"
+    name: "jdbc/hostname"
   });
 
   public static readonly JDBC_PORT = ParamNames.appConfigPath({
@@ -88,19 +63,40 @@ export class ParamNames {
     name: "jdbc/port"
   });
 
-  public static readonly JDBC_HOSTNAME = ParamNames.appConfigPath({
-    context: ParamNames.SHARED_CONTEXT,
-    name: "jdbc/hostname"
-  });
-
   public static readonly JDBC_READER_HOSTNAME = ParamNames.appConfigPath({
     context: ParamNames.SHARED_CONTEXT,
     name: "jdbc/reader-hostname"
   });
 
-  static envPath(options: AppConfigOptions): string {
-    return `/env/${options.context}/${options.name}`;
-  }
+  public static readonly JDBC_URL = ParamNames.appConfigPath({
+    context: ParamNames.SHARED_CONTEXT,
+    name: "jdbc/url"
+  });
+
+  public static readonly KMS_ARN = ParamNames.envPath({
+    context: "kms",
+    name: `${ParamNames.APP_NAME}/arn`
+  });
+
+  public static readonly KMS_ID = ParamNames.envPath({
+    context: "kms",
+    name: `${ParamNames.APP_NAME}/id`
+  });
+
+  public static readonly PG_ADMIN_SECRET: string = ParamNames.appSecretPath({
+    context: ParamNames.APP_NAME,
+    name: "dbadmin"
+  });
+
+  public static readonly PG_SG_ID: string = ParamNames.envPath({
+    context: "security-groups",
+    name: `postgres/${ParamNames.APP_NAME}/id`
+  });
+
+  public static readonly VPC_ID = ParamNames.envPath({
+    context: "vpc",
+    name: `${ParamNames.APP_NAME}/id`
+  });
 
   static appConfigPath(options: AppConfigOptions): string {
     return `/config/${options.context}/${options.name}`;
@@ -108,5 +104,9 @@ export class ParamNames {
 
   static appSecretPath(options: AppConfigOptions): string {
     return `/secret/${options.context}/${options.name}`;
+  }
+
+  static envPath(options: AppConfigOptions): string {
+    return `/env/${options.context}/${options.name}`;
   }
 }

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import "source-map-support/register";
-import cp from "node:child_process";
 import { AppStagingSynthesizer } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as cdk from "aws-cdk-lib";
+import cp from "node:child_process";
+
 import { PrototypeStagingStack } from "../lib/app-staging-stack.js";
 import { ApplicationServiceStack } from "../lib/application-service-stack.js";
 import { ApplicationStack } from "../lib/application-stack.js";
@@ -23,9 +24,9 @@ const app = new cdk.App({
   defaultStackSynthesizer: AppStagingSynthesizer.customFactory({
     factory: PrototypeStagingStack.factory({
       appId: "demoapp",
+      autoDeleteStagingAssets: false,
       imageAssetVersionCount: 10,
-      maxImageAge: 30,
-      autoDeleteStagingAssets: false
+      maxImageAge: 30
     }),
     oncePerEnv: true
   })
@@ -40,8 +41,8 @@ const env = {
 
 const foundationStack = new FoundationStack(app, "FoundationStack", {
   env: env,
-  serviceName: serviceName,
-  revision: revision
+  revision: revision,
+  serviceName: serviceName
 });
 
 const vpcStack = new VpcStack(app, "VpcStack", {
@@ -50,59 +51,59 @@ const vpcStack = new VpcStack(app, "VpcStack", {
   serviceNetworkArn: serviceNetworkArn
 });
 new EC2TesterStack(app, "EC2TesterStack", {
+  endpointSecurityGroup: vpcStack.endpointSecurityGroup,
   env: env,
-  vpc: vpcStack.vpc,
-  endpointSecurityGroup: vpcStack.endpointSecurityGroup
+  vpc: vpcStack.vpc
 });
 
 const dbStack = new DatabaseStack(app, "DatabasePostgresStack", {
-  env: env,
   artifactsBucket: foundationStack.artifactsBucket,
+  endpointSecurityGroup: vpcStack.endpointSecurityGroup,
+  env: env,
   revision: revision,
   serviceName: serviceName,
-  vpc: vpcStack.vpc,
-  endpointSecurityGroup: vpcStack.endpointSecurityGroup
+  vpc: vpcStack.vpc
 });
 dbStack.addDependency(foundationStack);
 
 const sqlStack = new SqlStack(app, "SqlStack", {
+  dbCluster: dbStack.dbCluster,
+  dbMasterCreds: dbStack.dbAdminCreds,
+  encryptionKey: foundationStack.kmsKey,
   env: env,
   logGroup: foundationStack.flywayLogGroup,
-  dbCluster: dbStack.dbCluster,
-  vpc: vpcStack.vpc,
-  encryptionKey: foundationStack.kmsKey,
-  dbMasterCreds: dbStack.dbAdminCreds,
   placeholders: {
     appuser_username: "appuser"
   },
   secretPlaceHolders: {
     appuser_secret: dbStack.appUserCreds
-  }
+  },
+  vpc: vpcStack.vpc
 });
 sqlStack.addDependency(dbStack);
 
 const appStack = new ApplicationStack(app, "SpringBootDemoAppStack", {
-  env: env,
-  serviceName: serviceName,
-  logGroup: foundationStack.appLogGroup,
-  revision: revision,
+  appUserSecret: dbStack.appUserCreds,
   dbCluster: dbStack.dbCluster,
   endpointSecurityGroup: vpcStack.endpointSecurityGroup,
-  vpc: vpcStack.vpc,
-  appUserSecret: dbStack.appUserCreds,
+  env: env,
+  logGroup: foundationStack.appLogGroup,
+  privateHostedZone: vpcStack.privateHostedZone,
+  revision: revision,
+  serviceName: serviceName,
   serviceNetworkArn: serviceNetworkArn,
-  privateHostedZone: vpcStack.privateHostedZone
+  vpc: vpcStack.vpc
 });
 appStack.addDependency(sqlStack);
 
 new ApplicationServiceStack(app, "SpringBootDemoAppServiceStack", {
   env: env,
-  serviceName: serviceName,
-  vpc: vpcStack.vpc,
   kmsKey: foundationStack.kmsKey,
-  serviceNetworkArn: serviceNetworkArn,
+  loadBalancer: appStack.alb,
   privateHostedZone: vpcStack.privateHostedZone,
-  loadBalancer: appStack.alb
+  serviceName: serviceName,
+  serviceNetworkArn: serviceNetworkArn,
+  vpc: vpcStack.vpc
 });
 
 app.synth({

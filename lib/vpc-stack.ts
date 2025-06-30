@@ -5,6 +5,7 @@ import * as route53profiles from "aws-cdk-lib/aws-route53profiles";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import * as vpclattice from "aws-cdk-lib/aws-vpclattice";
 import { Construct } from "constructs";
+
 import { ParamNames } from "./names.js";
 
 export interface VpcStackProperties extends cdk.StackProps {
@@ -13,44 +14,44 @@ export interface VpcStackProperties extends cdk.StackProps {
 }
 
 export class VpcStack extends cdk.Stack {
-  public readonly vpc: ec2.IVpc;
   public readonly endpointSecurityGroup: ec2.ISecurityGroup;
   public readonly privateHostedZone: route53.IPrivateHostedZone;
+  public readonly vpc: ec2.IVpc;
 
   constructor(scope: Construct, id: string, properties: VpcStackProperties) {
     super(scope, id, properties);
 
     this.vpc = new ec2.Vpc(this, "DemoAppVpc", {
-      vpcName: "DemoAppVpc",
       availabilityZones: this.availabilityZones,
-      natGateways: 0,
+      createInternetGateway: false,
+      defaultInstanceTenancy: ec2.DefaultInstanceTenancy.DEFAULT,
       enableDnsHostnames: true,
       enableDnsSupport: true,
-      createInternetGateway: false,
-      restrictDefaultSecurityGroup: true,
-      ipProtocol: ec2.IpProtocol.DUAL_STACK,
-      ipAddresses: ec2.IpAddresses.cidr(properties.ipv4Cidr),
-      ipv6Addresses: ec2.Ipv6Addresses.amazonProvided(),
-      defaultInstanceTenancy: ec2.DefaultInstanceTenancy.DEFAULT,
       gatewayEndpoints: {
         S3: {
           service: ec2.GatewayVpcEndpointAwsService.S3
         }
       },
+      ipAddresses: ec2.IpAddresses.cidr(properties.ipv4Cidr),
+      ipProtocol: ec2.IpProtocol.DUAL_STACK,
+      ipv6Addresses: ec2.Ipv6Addresses.amazonProvided(),
+      natGateways: 0,
+      restrictDefaultSecurityGroup: true,
       subnetConfiguration: [
         {
-          subnetType: ec2.SubnetType.PRIVATE_ISOLATED,
-          name: "default"
+          name: "default",
+          subnetType: ec2.SubnetType.PRIVATE_ISOLATED
         }
-      ]
+      ],
+      vpcName: "DemoAppVpc"
     });
 
     this.endpointSecurityGroup = new ec2.SecurityGroup(this, "EndpointSecurityGroup", {
-      vpc: this.vpc,
       allowAllIpv6Outbound: false,
       allowAllOutbound: false,
+      description: "Security group for VPC endpoints",
       disableInlineRules: true,
-      description: "Security group for VPC endpoints"
+      vpc: this.vpc
     });
     this.endpointSecurityGroup.addIngressRule(
       this.endpointSecurityGroup,
@@ -60,104 +61,104 @@ export class VpcStack extends cdk.Stack {
     cdk.Tags.of(this.endpointSecurityGroup).add("Name", "EndpointSecurityGroup");
 
     new ssm.StringParameter(this, "EndpointSecurityGroupParam", {
-      stringValue: this.endpointSecurityGroup.securityGroupId,
+      description: "Security group ID for VPC endpoints",
       parameterName: ParamNames.ENDPOINT_SG_ID,
-      description: "Security group ID for VPC endpoints"
+      stringValue: this.endpointSecurityGroup.securityGroupId
     });
 
     this.vpc.addInterfaceEndpoint("kms", {
-      service: ec2.InterfaceVpcEndpointAwsService.KMS,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.KMS
     });
 
     this.vpc.addInterfaceEndpoint("ec2", {
-      service: ec2.InterfaceVpcEndpointAwsService.EC2,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.EC2
     });
 
     this.vpc.addInterfaceEndpoint("ec2messages", {
-      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.EC2_MESSAGES
     });
 
     this.vpc.addInterfaceEndpoint("ecr", {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.ECR
     });
 
     this.vpc.addInterfaceEndpoint("secretsmanager", {
-      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER
     });
 
     this.vpc.addInterfaceEndpoint("ssm", {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.SSM
     });
 
     this.vpc.addInterfaceEndpoint("ssm-messages", {
-      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.SSM_MESSAGES
     });
 
     this.vpc.addInterfaceEndpoint("logs", {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS
     });
 
     this.vpc.addInterfaceEndpoint("cloudwatch", {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_MONITORING
     });
 
     this.vpc.addInterfaceEndpoint("cloudformation", {
-      service: ec2.InterfaceVpcEndpointAwsService.CLOUDFORMATION,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.CLOUDFORMATION
     });
 
     this.vpc.addInterfaceEndpoint("ecs", {
-      service: ec2.InterfaceVpcEndpointAwsService.ECS,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.ECS
     });
 
     this.vpc.addInterfaceEndpoint("ecr-docker", {
-      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER
     });
 
     this.vpc.addInterfaceEndpoint("ecs-telemetry", {
-      service: ec2.InterfaceVpcEndpointAwsService.ECS_TELEMETRY,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.ECS_TELEMETRY
     });
 
     this.vpc.addInterfaceEndpoint("lambda", {
-      service: ec2.InterfaceVpcEndpointAwsService.LAMBDA,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.LAMBDA
     });
 
     this.vpc.addInterfaceEndpoint("elb", {
-      service: ec2.InterfaceVpcEndpointAwsService.ELASTIC_LOAD_BALANCING,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.ELASTIC_LOAD_BALANCING
     });
 
     this.vpc.addInterfaceEndpoint("rds", {
-      service: ec2.InterfaceVpcEndpointAwsService.RDS,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.RDS
     });
 
     this.vpc.addInterfaceEndpoint("rds-data", {
-      service: ec2.InterfaceVpcEndpointAwsService.RDS_DATA,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.RDS_DATA
     });
 
     this.vpc.addInterfaceEndpoint("sts", {
-      service: ec2.InterfaceVpcEndpointAwsService.STS,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.STS
     });
 
     this.vpc.addInterfaceEndpoint("autoscaling", {
-      service: ec2.InterfaceVpcEndpointAwsService.AUTOSCALING,
-      securityGroups: [this.endpointSecurityGroup]
+      securityGroups: [this.endpointSecurityGroup],
+      service: ec2.InterfaceVpcEndpointAwsService.AUTOSCALING
     });
 
     this.vpc.addInterfaceEndpoint("vpc-lattice", {
@@ -165,11 +166,11 @@ export class VpcStack extends cdk.Stack {
     });
 
     const latticeSecurityGroup = new ec2.SecurityGroup(this, "LatticeSecurityGroup", {
-      vpc: this.vpc,
       allowAllIpv6Outbound: false,
       allowAllOutbound: false,
+      description: "Access to VPC Lattice Services",
       disableInlineRules: true,
-      description: "Access to VPC Lattice Services"
+      vpc: this.vpc
     });
     cdk.Tags.of(latticeSecurityGroup).add("Name", "LatticeSecurityGroup");
 
@@ -196,14 +197,14 @@ export class VpcStack extends cdk.Stack {
     );
 
     new vpclattice.CfnServiceNetworkVpcAssociation(this, "ServiceNetworkAssociation", {
+      securityGroupIds: [latticeSecurityGroup.securityGroupId],
       serviceNetworkIdentifier: properties.serviceNetworkArn,
-      vpcIdentifier: this.vpc.vpcId,
-      securityGroupIds: [latticeSecurityGroup.securityGroupId]
+      vpcIdentifier: this.vpc.vpcId
     });
 
     this.privateHostedZone = new route53.PrivateHostedZone(this, "PrivateHostedZone", {
-      vpc: this.vpc,
       comment: "Private hosted zone for internal DNS resolution",
+      vpc: this.vpc,
       zoneName: "apps.gs.internal"
     });
 

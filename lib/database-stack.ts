@@ -5,24 +5,24 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
-
 import { Construct } from "constructs";
+
 import { ParamNames } from "./names.js";
 export interface DatabaseStackProperties extends cdk.StackProps {
-  readonly vpc: ec2.IVpc;
   readonly artifactsBucket: s3.IBucket;
-  readonly serviceName: string;
-  readonly revision: string;
   readonly endpointSecurityGroup: ec2.ISecurityGroup;
+  readonly revision: string;
+  readonly serviceName: string;
+  readonly vpc: ec2.IVpc;
 }
 
 export class DatabaseStack extends cdk.Stack {
+  public appUserCreds: secretsmanager.ISecret;
+  artifactsBucket: s3.IBucket;
+  public dbAdminCreds: secretsmanager.ISecret;
   public dbCluster: rds.DatabaseCluster;
   public dbUrl: ssm.IStringParameter;
-  public dbAdminCreds: secretsmanager.ISecret;
-  public appUserCreds: secretsmanager.ISecret;
   kmsKey: kms.IKey;
-  artifactsBucket: s3.IBucket;
   vpc: ec2.IVpc;
 
   constructor(scope: Construct, id: string, properties: DatabaseStackProperties) {
@@ -40,15 +40,15 @@ export class DatabaseStack extends cdk.Stack {
     );
 
     this.dbAdminCreds = new rds.DatabaseSecret(this, "AdminCreds", {
+      encryptionKey: this.kmsKey,
       secretName: ParamNames.PG_ADMIN_SECRET,
-      username: "dbadmin",
-      encryptionKey: this.kmsKey
+      username: "dbadmin"
     });
 
     this.appUserCreds = new rds.DatabaseSecret(this, "AppuserCreds", {
+      encryptionKey: this.kmsKey,
       secretName: ParamNames.DEMO_APP_USER_SECRET,
-      username: "appuser",
-      encryptionKey: this.kmsKey
+      username: "appuser"
     });
 
     const parameterGroup = new rds.ParameterGroup(this, "DBParameterGroup", {
@@ -56,45 +56,45 @@ export class DatabaseStack extends cdk.Stack {
         version: rds.AuroraPostgresEngineVersion.VER_16_2
       }),
       parameters: {
+        "rds.force_ssl": "1",
         ssl: "1",
-        ssl_min_protocol_version: "TLSv1.2",
-        "rds.force_ssl": "1"
+        ssl_min_protocol_version: "TLSv1.2"
       }
     });
 
     const securityGroup = new ec2.SecurityGroup(this, "DBSecurityGroup", {
-      vpc: properties.vpc,
+      allowAllIpv6Outbound: false,
       allowAllOutbound: false,
       description: "Security group for Aurora Postgres",
       disableInlineRules: true,
-      allowAllIpv6Outbound: false
+      vpc: properties.vpc
     });
 
     this.dbCluster = new rds.DatabaseCluster(this, "DBCluster", {
-      networkType: rds.NetworkType.DUAL,
-      defaultDatabaseName: properties.serviceName,
-      parameterGroup: parameterGroup,
       cloudwatchLogsExports: ["postgresql"],
-      enableDataApi: true,
       credentials: rds.Credentials.fromSecret(this.dbAdminCreds),
-      storageEncryptionKey: this.kmsKey,
+      defaultDatabaseName: properties.serviceName,
+      deletionProtection: false,
+      enableDataApi: true,
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_16_2
       }),
-      writer: rds.ClusterInstance.serverlessV2("WriterNode"),
-      serverlessV2MaxCapacity: 2,
-      serverlessV2MinCapacity: 0.5,
+      networkType: rds.NetworkType.DUAL,
+      parameterGroup: parameterGroup,
       readers: [
         rds.ClusterInstance.serverlessV2("ReaderNode1", {
           scaleWithWriter: true
         })
       ],
       securityGroups: [securityGroup],
-      deletionProtection: false,
+      serverlessV2MaxCapacity: 2,
+      serverlessV2MinCapacity: 0.5,
+      storageEncryptionKey: this.kmsKey,
       vpc: this.vpc,
       vpcSubnets: this.vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED
-      })
+      }),
+      writer: rds.ClusterInstance.serverlessV2("WriterNode")
     });
 
     // this.dbCluster.addRotationSingleUser({

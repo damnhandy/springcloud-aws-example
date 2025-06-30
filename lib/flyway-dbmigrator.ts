@@ -1,5 +1,3 @@
-import * as cp from "node:child_process";
-import path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as kms from "aws-cdk-lib/aws-kms";
@@ -9,24 +7,26 @@ import * as rds from "aws-cdk-lib/aws-rds";
 import * as s3assets from "aws-cdk-lib/aws-s3-assets";
 import * as sm from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
-
 import { Construct } from "constructs";
+import * as cp from "node:child_process";
+import path from "node:path";
+
 import { ParamNames as ParameterNames } from "./names.js";
 
 /**
  *
  */
 export interface DBMigrationConstructProperties extends cdk.StageProps {
-  readonly vpc: ec2.IVpc;
-  readonly vpcSubnets: ec2.SubnetSelection;
-  readonly encryptionKey: kms.IKey;
-  readonly locations: s3assets.Asset;
   readonly database: rds.DatabaseCluster;
-  readonly masterPassword: sm.ISecret;
+  readonly encryptionKey: kms.IKey;
   readonly ephemeralStorageSize?: cdk.Size;
+  readonly locations: s3assets.Asset;
+  readonly logGroup: logs.ILogGroup;
+  readonly masterPassword: sm.ISecret;
   readonly placeholders?: Record<string, string>;
   readonly secretPlaceHolders?: Record<string, sm.ISecret>;
-  readonly logGroup: logs.ILogGroup;
+  readonly vpc: ec2.IVpc;
+  readonly vpcSubnets: ec2.SubnetSelection;
 }
 
 /**
@@ -39,24 +39,24 @@ export class DBMigrationConstruct extends Construct {
     super(scope, id);
 
     const securityGroup = new ec2.SecurityGroup(this, `${id}DBMigratorSecurityGroup`, {
-      vpc: properties.vpc,
+      allowAllIpv6Outbound: false,
       allowAllOutbound: false,
-      allowAllIpv6Outbound: false
+      vpc: properties.vpc
     });
     cdk.Tags.of(securityGroup).add("Name", `${id}DBMigratorSecurityGroup`);
 
     const functionDir = path.resolve(import.meta.dirname, "../flyway-lambda");
     const function_ = new lambda.SingletonFunction(this, `${id}DBMigratorFunction`, {
-      description: "Custom resource function to deploy schema migrations using Flyway",
+      allowAllOutbound: false,
+      applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
       code: lambda.Code.fromAsset(functionDir, {
         bundling: {
-          image: lambda.Runtime.JAVA_21.bundlingImage,
           command: [
             "/bin/sh",
             "-c",
             "./gradlew build -x test --no-daemon && cp /asset-input/build/distributions/flyway-lambda.zip /asset-output/"
           ],
-          outputType: cdk.BundlingOutput.ARCHIVED,
+          image: lambda.Runtime.JAVA_21.bundlingImage,
           local: {
             tryBundle(outputDir: string) {
               try {
@@ -71,23 +71,23 @@ export class DBMigrationConstruct extends Construct {
               );
               return true;
             }
-          }
+          },
+          outputType: cdk.BundlingOutput.ARCHIVED
         }
       }),
-      tracing: lambda.Tracing.ACTIVE,
-      logGroup: properties.logGroup,
-      loggingFormat: lambda.LoggingFormat.JSON,
-      applicationLogLevelV2: lambda.ApplicationLogLevel.INFO,
-      systemLogLevelV2: lambda.SystemLogLevel.INFO,
-      handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
-      runtime: lambda.Runtime.JAVA_17,
-      ephemeralStorageSize: properties.ephemeralStorageSize ?? cdk.Size.mebibytes(512),
-      uuid: "CC2B87AC-AA48-4B81-B4E3-FE9C4AE28A2F",
-      vpc: properties.vpc,
-      vpcSubnets: properties.vpcSubnets,
+      description: "Custom resource function to deploy schema migrations using Flyway",
+      environment: {
+        JAVA_TOOL_OPTIONS: "-Djava.net.preferIPv4Stack=true",
+        LOG_LEVEL: "DEBUG",
+        POWERTOOLS_LOG_LEVEL: "INFO",
+        POWERTOOLS_SERVICE_NAME: "DBMigrator"
+      },
       environmentEncryption: properties.encryptionKey,
+      ephemeralStorageSize: properties.ephemeralStorageSize ?? cdk.Size.mebibytes(512),
+      handler: "com.damnhandy.functions.dbmigrator.DBMigratorHandler::handleRequest",
+      loggingFormat: lambda.LoggingFormat.JSON,
+      logGroup: properties.logGroup,
       memorySize: 512,
-      timeout: cdk.Duration.minutes(10),
       paramsAndSecrets: lambda.ParamsAndSecretsLayerVersion.fromVersion(
         lambda.ParamsAndSecretsVersions.V1_0_103,
         {
@@ -96,13 +96,13 @@ export class DBMigrationConstruct extends Construct {
           logLevel: lambda.ParamsAndSecretsLogLevel.WARN
         }
       ),
-      allowAllOutbound: false,
-      environment: {
-        POWERTOOLS_LOG_LEVEL: "INFO",
-        POWERTOOLS_SERVICE_NAME: "DBMigrator",
-        LOG_LEVEL: "DEBUG",
-        JAVA_TOOL_OPTIONS: "-Djava.net.preferIPv4Stack=true"
-      }
+      runtime: lambda.Runtime.JAVA_17,
+      systemLogLevelV2: lambda.SystemLogLevel.INFO,
+      timeout: cdk.Duration.minutes(10),
+      tracing: lambda.Tracing.ACTIVE,
+      uuid: "CC2B87AC-AA48-4B81-B4E3-FE9C4AE28A2F",
+      vpc: properties.vpc,
+      vpcSubnets: properties.vpcSubnets
     });
 
     const assetsKey = kms.Key.fromKeyArn(
@@ -135,16 +135,16 @@ export class DBMigrationConstruct extends Construct {
       }
     }
     const cr = new cdk.CustomResource(this, `${id}DBMigrator`, {
-      resourceType: "Custom::DBMigrator",
-      serviceToken: function_.functionArn,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
       properties: {
-        masterSecret: properties.masterPassword.secretName,
         locations: properties.locations.s3ObjectUrl,
+        masterSecret: properties.masterPassword.secretName,
         mixed: true,
         placeHolders: properties.placeholders,
         secretPlaceHolders: this.resolvedSecretPlaceHolders
-      }
+      },
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      resourceType: "Custom::DBMigrator",
+      serviceToken: function_.functionArn
     });
     cr.node.addDependency(properties.database);
     this.response = cr.getAtt("Response").toString();

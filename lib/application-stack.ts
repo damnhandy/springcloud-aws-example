@@ -1,19 +1,16 @@
-import path from "node:path";
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import * as ecs from "aws-cdk-lib/aws-ecs";
-
 import * as lb from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as kms from "aws-cdk-lib/aws-kms";
 import * as logs from "aws-cdk-lib/aws-logs";
-
 import * as rds from "aws-cdk-lib/aws-rds";
 import * as route53 from "aws-cdk-lib/aws-route53";
 import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ssm from "aws-cdk-lib/aws-ssm";
-
 import { Construct } from "constructs";
+import path from "node:path";
 
 import { ParamNames } from "./names.js";
 
@@ -21,26 +18,26 @@ import { ParamNames } from "./names.js";
  *
  */
 export interface ApplicationStackProperties extends cdk.StackProps {
-  readonly serviceName: string;
-  readonly revision: string;
+  readonly appUserSecret: secretsmanager.ISecret;
   readonly dbCluster: rds.IDatabaseCluster;
-  readonly vpc: ec2.IVpc;
   readonly endpointSecurityGroup: ec2.ISecurityGroup;
   readonly logGroup: logs.ILogGroup;
-  readonly appUserSecret: secretsmanager.ISecret;
-  readonly serviceNetworkArn: string;
   readonly privateHostedZone: route53.IPrivateHostedZone;
+  readonly revision: string;
+  readonly serviceName: string;
+  readonly serviceNetworkArn: string;
+  readonly vpc: ec2.IVpc;
 }
 
 /**
  *
  */
 export class ApplicationStack extends cdk.Stack {
+  public readonly alb: lb.IApplicationLoadBalancer;
   appRepo: ecr.IRepository;
-  vpc: ec2.IVpc;
   kmsKey: kms.IKey;
 
-  public readonly alb: lb.IApplicationLoadBalancer;
+  vpc: ec2.IVpc;
 
   constructor(scope: Construct, id: string, properties: ApplicationStackProperties) {
     super(scope, id, properties);
@@ -59,17 +56,21 @@ export class ApplicationStack extends cdk.Stack {
     );
 
     const cluster = new ecs.Cluster(this, "DemoCluster", {
-      vpc: this.vpc,
-      containerInsightsV2: ecs.ContainerInsights.ENABLED
+      containerInsightsV2: ecs.ContainerInsights.ENABLED,
+      vpc: this.vpc
     });
 
     const taskDefinition = new ecs.FargateTaskDefinition(this, "DemoAppTaskDef", {
-      memoryLimitMiB: 2048,
-      cpu: 1024
+      cpu: 1024,
+      memoryLimitMiB: 2048
     });
 
     const container = taskDefinition.addContainer("DemoAppContainer", {
       containerName: `${properties.serviceName}-container`,
+      environment: {
+        JAVA_TOOL_OPTIONS: `-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8`,
+        SPRING_PROFILES_ACTIVE: "aws"
+      },
       image: ecs.ContainerImage.fromAsset(path.resolve(import.meta.dirname, "../springboot-app"), {
         assetName: "springboot-app"
       }),
@@ -78,15 +79,11 @@ export class ApplicationStack extends cdk.Stack {
         streamPrefix: properties.serviceName
       }),
       secrets: {
-        DEMOAPP_DB_USERNAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "username"),
-        DEMOAPP_DB_PASSWORD: ecs.Secret.fromSecretsManager(properties.appUserSecret, "password"),
-        DEMOAPP_DB_NAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "dbname"),
         DEMOAPP_DB_HOST: ecs.Secret.fromSecretsManager(properties.appUserSecret, "host"),
-        DEMOAPP_DB_PORT: ecs.Secret.fromSecretsManager(properties.appUserSecret, "port")
-      },
-      environment: {
-        SPRING_PROFILES_ACTIVE: "aws",
-        JAVA_TOOL_OPTIONS: `-XX:InitialRAMPercentage=70 -XX:MaxRAMPercentage=70 -Dfile.encoding=UTF-8`
+        DEMOAPP_DB_NAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "dbname"),
+        DEMOAPP_DB_PASSWORD: ecs.Secret.fromSecretsManager(properties.appUserSecret, "password"),
+        DEMOAPP_DB_PORT: ecs.Secret.fromSecretsManager(properties.appUserSecret, "port"),
+        DEMOAPP_DB_USERNAME: ecs.Secret.fromSecretsManager(properties.appUserSecret, "username")
       }
     });
     this.kmsKey.grantEncryptDecrypt(taskDefinition.obtainExecutionRole());
@@ -107,9 +104,9 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     const ecsSecurityGroup = new ec2.SecurityGroup(this, "DemoAppSecurityGroup", {
-      vpc: this.vpc,
       allowAllOutbound: false,
-      disableInlineRules: true
+      disableInlineRules: true,
+      vpc: this.vpc
     });
     ecsSecurityGroup.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
     ecsSecurityGroup.connections.allowTo(properties.dbCluster, ec2.Port.tcp(5432));
@@ -136,9 +133,9 @@ export class ApplicationStack extends cdk.Stack {
     const service = new ecs.FargateService(this, "DemoAppService", {
       assignPublicIp: false,
       cluster,
-      taskDefinition,
       desiredCount: 1,
       securityGroups: [ecsSecurityGroup],
+      taskDefinition,
       vpcSubnets: this.vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED
       })
@@ -159,9 +156,9 @@ export class ApplicationStack extends cdk.Stack {
     albSg.connections.allowFrom(ec2.Peer.prefixList("pl-073555187c4e6ccf2"), ec2.Port.tcp(443));
 
     this.alb = new lb.ApplicationLoadBalancer(this, "DemoAppAlb", {
-      vpc: this.vpc,
       internetFacing: false,
       securityGroup: albSg,
+      vpc: this.vpc,
       vpcSubnets: this.vpc.selectSubnets({
         subnetType: ec2.SubnetType.PRIVATE_ISOLATED
       })
@@ -182,24 +179,24 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     listener.addTargets("DemoAppTargetGroup", {
+      healthCheck: {
+        healthyHttpCodes: "200",
+        interval: cdk.Duration.seconds(60),
+        path: "/actuator/health/liveness",
+        port: "8081",
+        protocol: lb.Protocol.HTTP,
+        timeout: cdk.Duration.seconds(5)
+      },
+      port: 80,
       protocol: lb.ApplicationProtocol.HTTP,
       protocolVersion: lb.ApplicationProtocolVersion.HTTP1,
-      port: 80,
       targets: [
         service.loadBalancerTarget({
           containerName: container.containerName,
           containerPort: container.containerPort,
           protocol: ecs.Protocol.TCP
         })
-      ],
-      healthCheck: {
-        interval: cdk.Duration.seconds(60),
-        timeout: cdk.Duration.seconds(5),
-        path: "/actuator/health/liveness",
-        protocol: lb.Protocol.HTTP,
-        port: "8081",
-        healthyHttpCodes: "200"
-      }
+      ]
     });
 
     this.alb.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));

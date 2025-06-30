@@ -5,6 +5,7 @@ import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
+
 import { ParamNames } from "./names.js";
 
 /**
@@ -12,13 +13,13 @@ import { ParamNames } from "./names.js";
  */
 export interface FoundationStackProperties extends cdk.StackProps {
   /**
-   * The name of the service and its associated database.
-   */
-  readonly serviceName: string;
-  /**
    * The revision identifier
    */
   readonly revision: string;
+  /**
+   * The name of the service and its associated database.
+   */
+  readonly serviceName: string;
 }
 
 /**
@@ -26,10 +27,10 @@ export interface FoundationStackProperties extends cdk.StackProps {
  * deleted.
  */
 export class FoundationStack extends cdk.Stack {
-  public readonly kmsKey: kms.Key;
-  public readonly artifactsBucket: s3.IBucket;
   public readonly appLogGroup: logs.ILogGroup;
+  public readonly artifactsBucket: s3.IBucket;
   public readonly flywayLogGroup: logs.ILogGroup;
+  public readonly kmsKey: kms.Key;
 
   constructor(scope: Construct, id: string, properties: FoundationStackProperties) {
     super(scope, id, properties);
@@ -38,9 +39,9 @@ export class FoundationStack extends cdk.Stack {
     }
 
     this.kmsKey = new kms.Key(this, "DemoAppKey", {
-      enableKeyRotation: true,
       alias: "alias/DemoAppKey",
       enabled: true,
+      enableKeyRotation: true,
       pendingWindow: cdk.Duration.days(7),
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       rotationPeriod: cdk.Duration.days(90)
@@ -52,15 +53,15 @@ export class FoundationStack extends cdk.Stack {
     this.appLogGroup = new logs.LogGroup(this, "DemoAppLogGroup", {
       encryptionKey: this.kmsKey,
       logGroupName: `/app/logs/${properties.serviceName}`,
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_WEEK
     });
 
     this.flywayLogGroup = new logs.LogGroup(this, "FlywayAppLogGroup", {
       encryptionKey: this.kmsKey,
       logGroupName: `/app/logs/flyway-custom-resource`,
-      retention: logs.RetentionDays.ONE_WEEK,
-      removalPolicy: cdk.RemovalPolicy.DESTROY
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      retention: logs.RetentionDays.ONE_WEEK
     });
 
     new ssm.StringParameter(this, "AppLogGroup", {

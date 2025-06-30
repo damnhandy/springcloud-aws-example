@@ -1,11 +1,9 @@
-import * as fs from "node:fs";
-import path from "node:path";
 import {
   BootstrapRole,
   FileStagingLocation,
+  ImageStagingLocation,
   IStagingResources,
-  IStagingResourcesFactory,
-  ImageStagingLocation
+  IStagingResourcesFactory
 } from "@aws-cdk/app-staging-synthesizer-alpha";
 import * as ecr from "aws-cdk-lib/aws-ecr";
 import { TagStatus } from "aws-cdk-lib/aws-ecr";
@@ -19,31 +17,19 @@ import {
   DockerImageAssetSource,
   Duration,
   FileAssetSource,
+  INLINE_CUSTOM_RESOURCE_CONTEXT,
   ISynthesisSession,
   RemovalPolicy,
   Stack,
-  StackProps,
-  INLINE_CUSTOM_RESOURCE_CONTEXT
+  StackProps
 } from "aws-cdk-lib/core";
 import { StringSpecializer } from "aws-cdk-lib/core/lib/helpers-internal";
 import * as cxapi from "aws-cdk-lib/cx-api";
 import { Construct } from "constructs";
+import * as fs from "node:fs";
+import path from "node:path";
 
 export const DEPLOY_TIME_PREFIX = "deploy-time/";
-
-/**
- * This is a dummy construct meant to signify that a stack is utilizing
- * the AppStagingSynthesizer. It does not do anything, and is not meant
- * to be created on its own. This construct will be a part of the
- * construct tree only and not the Cfn template. The construct tree is
- * then encoded in the AWS::CDK::Metadata resource of the stack and
- * injested in our metrics like every other construct.
- */
-export class UsingAppStagingSynthesizer extends Construct {
-  constructor(scope: Construct, id: string) {
-    super(scope, id);
-  }
-}
 
 /**
  * User configurable options to the DefaultStagingStack.
@@ -61,25 +47,12 @@ export interface PrototypeStagingStackOptions {
   readonly appId: string;
 
   /**
-   * Explicit name for the staging bucket
+   * Auto deletes objects in the staging S3 bucket and images in the
+   * staging ECR repositories.
    *
-   * @default - a well-known name unique to this app/env.
+   * @default true
    */
-  readonly stagingBucketName?: string;
-
-  /**
-   * Pass in an existing role to be used as the file publishing role.
-   *
-   * @default - a new role will be created
-   */
-  readonly fileAssetPublishingRole?: BootstrapRole;
-
-  /**
-   * Pass in an existing role to be used as the image publishing role.
-   *
-   * @default - a new role will be created
-   */
-  readonly imageAssetPublishingRole?: BootstrapRole;
+  readonly autoDeleteStagingAssets?: boolean;
 
   /**
    * The lifetime for deploy time file assets.
@@ -99,6 +72,20 @@ export interface PrototypeStagingStackOptions {
   readonly deployTimeFileAssetLifetime?: Duration;
 
   /**
+   * Pass in an existing role to be used as the file publishing role.
+   *
+   * @default - a new role will be created
+   */
+  readonly fileAssetPublishingRole?: BootstrapRole;
+
+  /**
+   * Pass in an existing role to be used as the image publishing role.
+   *
+   * @default - a new role will be created
+   */
+  readonly imageAssetPublishingRole?: BootstrapRole;
+
+  /**
    * The maximum number of image versions to store in a repository.
    *
    * Previous versions of an image can be stored for rollback purposes.
@@ -110,15 +97,14 @@ export interface PrototypeStagingStackOptions {
    */
   readonly imageAssetVersionCount?: number;
 
-  /**
-   * Auto deletes objects in the staging S3 bucket and images in the
-   * staging ECR repositories.
-   *
-   * @default true
-   */
-  readonly autoDeleteStagingAssets?: boolean;
-
   readonly maxImageAge: number;
+
+  /**
+   * Explicit name for the staging bucket
+   *
+   * @default - a well-known name unique to this app/env.
+   */
+  readonly stagingBucketName?: string;
 }
 
 /**
@@ -150,6 +136,87 @@ export interface PrototypeStagingStackProperties extends PrototypeStagingStackOp
  */
 export class PrototypeStagingStack extends Stack implements IStagingResources {
   /**
+   * The stack to add dependencies to.
+   */
+  public readonly dependencyStack: Stack;
+
+  /**
+   * The app-scoped, evironment-keyed staging bucket.
+   */
+  public readonly stagingBucket?: s3.Bucket;
+
+  /**
+   * The app-scoped, environment-keyed ecr repositories associated with this app.
+   */
+  public readonly stagingRepos: Record<string, ecr.Repository>;
+
+  private readonly appId: string;
+
+  private autoDeleteStagingAssets: boolean;
+
+  private readonly deployRoleArn?: string;
+
+  private didImageRole = false;
+  private fileRole?: iam.IRole;
+
+  private fileRoleManifestArn?: string;
+  private imageRole?: iam.IRole;
+  private imageRoleManifestArn?: string;
+
+  /**
+   * File publish role ARN in asset manifest format
+   */
+  private readonly providedFileRole?: BootstrapRole;
+  /**
+   * Image publishing role ARN in asset manifest format
+   */
+  private readonly providedImageRole?: BootstrapRole;
+  private readonly stagingBucketName?: string;
+  /**
+   * Default asset publishing role name for file (S3) assets.
+   */
+  private get fileRoleName() {
+    return `cdk-${this.appId}-file-role-${this.region}`;
+  }
+  /**
+   * Default asset publishing role name for docker (ECR) assets.
+   */
+  private get imageRoleName() {
+    return `cdk-${this.appId}-image-role-${this.region}`;
+  }
+
+  constructor(
+    scope: App,
+    id: string,
+    private readonly properties: PrototypeStagingStackProperties
+  ) {
+    super(scope, id, {
+      ...properties,
+      analyticsReporting: false, // removing AWS::CDK::Metadata construct saves ~3KB
+      synthesizer: new BootstraplessSynthesizer()
+    });
+    // removing path metadata saves ~2KB
+    this.node.setContext(cxapi.PATH_METADATA_ENABLE_CONTEXT, false);
+
+    // For all resources under the default staging stack, we want to inline custom
+    // resources because the staging bucket necessary for custom resource assets
+    // does not exist yet.
+    this.node.setContext(INLINE_CUSTOM_RESOURCE_CONTEXT, true);
+    this.autoDeleteStagingAssets = properties.autoDeleteStagingAssets ?? true;
+
+    this.appId = this.validateAppId(properties.appId);
+    this.dependencyStack = this;
+
+    this.deployRoleArn = properties.deployRoleArn;
+    this.stagingBucketName = properties.stagingBucketName;
+    const specializer = new StringSpecializer(this, properties.qualifier);
+
+    this.providedFileRole = properties.fileAssetPublishingRole?._specialize(specializer);
+    this.providedImageRole = properties.imageAssetPublishingRole?._specialize(specializer);
+    this.stagingRepos = {};
+  }
+
+  /**
    * Return a factory that will create DefaultStagingStacks
    */
   public static factory(options: PrototypeStagingStackOptions): IStagingResourcesFactory {
@@ -174,117 +241,65 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
         return new PrototypeStagingStack(app, stackId, {
           ...options,
 
-          // Does not need to contain environment because stack names are unique inside an env anyway
-          stackName: `StagingStack-${appId}`,
+          appId,
+          deployRoleArn: context.deployRoleArn,
           env: {
             account: stack.account,
             region: stack.region
           },
-          appId,
           qualifier: context.qualifier,
-          deployRoleArn: context.deployRoleArn
+          // Does not need to contain environment because stack names are unique inside an env anyway
+          stackName: `StagingStack-${appId}`
         });
       }
     };
   }
 
   /**
-   * Default asset publishing role name for file (S3) assets.
+   * Synthesizes the cloudformation template into a cloud assembly.
+   * @internal
    */
-  private get fileRoleName() {
-    return `cdk-${this.appId}-file-role-${this.region}`;
+  public _synthesizeTemplate(session: ISynthesisSession, lookupRoleArn?: string): void {
+    super._synthesizeTemplate(session, lookupRoleArn);
+
+    const builder = session.assembly;
+    const outPath = path.join(builder.outdir, this.templateFile);
+    const size = fs.statSync(outPath).size;
+    if (size > 51_200) {
+      throw new Error(
+        `Staging resource template cannot be greater than 51200 bytes, but got ${size} bytes`
+      );
+    }
   }
 
-  /**
-   * Default asset publishing role name for docker (ECR) assets.
-   */
-  private get imageRoleName() {
-    return `cdk-${this.appId}-image-role-${this.region}`;
+  public addDockerImage(asset: DockerImageAssetSource): ImageStagingLocation {
+    // Has side effects so must go first
+    const repoName = this.getCreateRepo(asset);
+
+    return {
+      assumeRoleArn: this.imageRoleManifestArn,
+      dependencyStack: this,
+      repoName
+    };
   }
 
-  /**
-   * The app-scoped, evironment-keyed staging bucket.
-   */
-  public readonly stagingBucket?: s3.Bucket;
+  public addFile(asset: FileAssetSource): FileStagingLocation {
+    // Has side effects so must go first
+    const bucketName = this.getCreateBucket();
 
-  /**
-   * The app-scoped, environment-keyed ecr repositories associated with this app.
-   */
-  public readonly stagingRepos: Record<string, ecr.Repository>;
+    return {
+      assumeRoleArn: this.fileRoleManifestArn,
+      bucketName,
+      dependencyStack: this,
+      prefix: asset.deployTime ? DEPLOY_TIME_PREFIX : undefined
+    };
+  }
 
-  /**
-   * The stack to add dependencies to.
-   */
-  public readonly dependencyStack: Stack;
-
-  private readonly appId: string;
-  private readonly stagingBucketName?: string;
-
-  /**
-   * File publish role ARN in asset manifest format
-   */
-  private readonly providedFileRole?: BootstrapRole;
-  private fileRole?: iam.IRole;
-  private fileRoleManifestArn?: string;
-
-  /**
-   * Image publishing role ARN in asset manifest format
-   */
-  private readonly providedImageRole?: BootstrapRole;
-  private imageRole?: iam.IRole;
-  private didImageRole = false;
-  private imageRoleManifestArn?: string;
-  private autoDeleteStagingAssets: boolean;
-
-  private readonly deployRoleArn?: string;
-
-  constructor(
-    scope: App,
-    id: string,
-    private readonly properties: PrototypeStagingStackProperties
-  ) {
-    super(scope, id, {
-      ...properties,
-      synthesizer: new BootstraplessSynthesizer(),
-      analyticsReporting: false // removing AWS::CDK::Metadata construct saves ~3KB
+  private createBucketKey(): kms.IKey {
+    return new kms.Key(this, "BucketKey", {
+      admins: [new iam.AccountPrincipal(this.account)],
+      alias: `alias/cdk-${this.appId}-staging`
     });
-    // removing path metadata saves ~2KB
-    this.node.setContext(cxapi.PATH_METADATA_ENABLE_CONTEXT, false);
-
-    // For all resources under the default staging stack, we want to inline custom
-    // resources because the staging bucket necessary for custom resource assets
-    // does not exist yet.
-    this.node.setContext(INLINE_CUSTOM_RESOURCE_CONTEXT, true);
-    this.autoDeleteStagingAssets = properties.autoDeleteStagingAssets ?? true;
-
-    this.appId = this.validateAppId(properties.appId);
-    this.dependencyStack = this;
-
-    this.deployRoleArn = properties.deployRoleArn;
-    this.stagingBucketName = properties.stagingBucketName;
-    const specializer = new StringSpecializer(this, properties.qualifier);
-
-    this.providedFileRole = properties.fileAssetPublishingRole?._specialize(specializer);
-    this.providedImageRole = properties.imageAssetPublishingRole?._specialize(specializer);
-    this.stagingRepos = {};
-  }
-
-  private validateAppId(id: string) {
-    const errors = [];
-    if (id.length > 20) {
-      errors.push(`appId expected no more than 20 characters but got ${id.length} characters.`);
-    }
-    if (id !== id.toLocaleLowerCase()) {
-      errors.push("appId only accepts lowercase characters.");
-    }
-    if (!/^[a-z0-9-]*$/.test(id)) {
-      errors.push("appId expects only letters, numbers, and dashes ('-')");
-    }
-
-    if (errors.length > 0) {
-      throw new Error([`appId ${id} has errors:`, ...errors].join("\n"));
-    }
-    return id;
   }
 
   private ensureFileRole() {
@@ -298,17 +313,17 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
 
     const roleName = this.fileRoleName;
     this.fileRole = new iam.Role(this, "CdkFileRole", {
-      roleName,
-      assumedBy: new iam.AccountPrincipal(this.account)
+      assumedBy: new iam.AccountPrincipal(this.account),
+      roleName
     });
 
     this.fileRoleManifestArn = Stack.of(this).formatArn({
+      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
       partition: "${AWS::Partition}",
       region: "", // iam is global
-      service: "iam",
       resource: "role",
       resourceName: roleName,
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME
+      service: "iam"
     });
   }
 
@@ -329,24 +344,21 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
 
     const roleName = this.imageRoleName;
     this.imageRole = new iam.Role(this, "CdkImageRole", {
-      roleName,
-      assumedBy: new iam.AccountPrincipal(this.account)
+      assumedBy: new iam.AccountPrincipal(this.account),
+      roleName
     });
     this.imageRoleManifestArn = Stack.of(this).formatArn({
+      arnFormat: ArnFormat.SLASH_RESOURCE_NAME,
       partition: "${AWS::Partition}",
       region: "", // iam is global
-      service: "iam",
       resource: "role",
       resourceName: roleName,
-      arnFormat: ArnFormat.SLASH_RESOURCE_NAME
+      service: "iam"
     });
   }
 
-  private createBucketKey(): kms.IKey {
-    return new kms.Key(this, "BucketKey", {
-      alias: `alias/cdk-${this.appId}-staging`,
-      admins: [new iam.AccountPrincipal(this.account)]
-    });
+  private generateRepoName(name: string): string {
+    return name.toLocaleLowerCase().replace(".", "-");
   }
 
   private getCreateBucket() {
@@ -366,8 +378,8 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
       bucketName: stagingBucketName,
       ...(this.autoDeleteStagingAssets
         ? {
-            removalPolicy: RemovalPolicy.DESTROY,
-            autoDeleteObjects: true
+            autoDeleteObjects: true,
+            removalPolicy: RemovalPolicy.DESTROY
           }
         : {
             removalPolicy: RemovalPolicy.RETAIN
@@ -375,10 +387,10 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
       encryption: s3.BucketEncryption.KMS,
       encryptionKey: key,
 
-      // Many AWS account safety checkers will complain when buckets aren't versioned
-      versioned: true,
       // Many AWS account safety checkers will complain when SSL isn't enforced
-      enforceSSL: true
+      enforceSSL: true,
+      // Many AWS account safety checkers will complain when buckets aren't versioned
+      versioned: true
     });
 
     if (this.fileRole) {
@@ -389,8 +401,8 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
       bucket.addToResourcePolicy(
         new iam.PolicyStatement({
           actions: ["s3:GetObject*", "s3:GetBucket*", "s3:List*"],
-          resources: [bucket.bucketArn, bucket.arnForObjects("*")],
-          principals: [new iam.ArnPrincipal(this.deployRoleArn)]
+          principals: [new iam.ArnPrincipal(this.deployRoleArn)],
+          resources: [bucket.bucketArn, bucket.arnForObjects("*")]
         })
       );
     }
@@ -402,8 +414,8 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     });
 
     bucket.addLifecycleRule({
-      prefix: DEPLOY_TIME_PREFIX,
-      expiration: this.properties.deployTimeFileAssetLifetime ?? Duration.days(30)
+      expiration: this.properties.deployTimeFileAssetLifetime ?? Duration.days(30),
+      prefix: DEPLOY_TIME_PREFIX
     });
 
     return stagingBucketName;
@@ -425,7 +437,6 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     const repoName = this.generateRepoName(`${this.appId}/${asset.assetName}`);
     if (this.stagingRepos[asset.assetName] === undefined) {
       this.stagingRepos[asset.assetName] = new ecr.Repository(this, repoName, {
-        repositoryName: repoName,
         imageScanOnPush: true,
         lifecycleRules: [
           {
@@ -443,10 +454,11 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
             tagStatus: TagStatus.ANY
           }
         ],
+        repositoryName: repoName,
         ...(this.autoDeleteStagingAssets
           ? {
-              removalPolicy: RemovalPolicy.DESTROY,
-              autoDeleteImages: true
+              autoDeleteImages: true,
+              removalPolicy: RemovalPolicy.DESTROY
             }
           : {
               removalPolicy: RemovalPolicy.RETAIN
@@ -461,47 +473,35 @@ export class PrototypeStagingStack extends Stack implements IStagingResources {
     return repoName;
   }
 
-  private generateRepoName(name: string): string {
-    return name.toLocaleLowerCase().replace(".", "-");
-  }
-
-  public addFile(asset: FileAssetSource): FileStagingLocation {
-    // Has side effects so must go first
-    const bucketName = this.getCreateBucket();
-
-    return {
-      bucketName,
-      assumeRoleArn: this.fileRoleManifestArn,
-      prefix: asset.deployTime ? DEPLOY_TIME_PREFIX : undefined,
-      dependencyStack: this
-    };
-  }
-
-  public addDockerImage(asset: DockerImageAssetSource): ImageStagingLocation {
-    // Has side effects so must go first
-    const repoName = this.getCreateRepo(asset);
-
-    return {
-      repoName,
-      assumeRoleArn: this.imageRoleManifestArn,
-      dependencyStack: this
-    };
-  }
-
-  /**
-   * Synthesizes the cloudformation template into a cloud assembly.
-   * @internal
-   */
-  public _synthesizeTemplate(session: ISynthesisSession, lookupRoleArn?: string): void {
-    super._synthesizeTemplate(session, lookupRoleArn);
-
-    const builder = session.assembly;
-    const outPath = path.join(builder.outdir, this.templateFile);
-    const size = fs.statSync(outPath).size;
-    if (size > 51_200) {
-      throw new Error(
-        `Staging resource template cannot be greater than 51200 bytes, but got ${size} bytes`
-      );
+  private validateAppId(id: string) {
+    const errors = [];
+    if (id.length > 20) {
+      errors.push(`appId expected no more than 20 characters but got ${id.length} characters.`);
     }
+    if (id !== id.toLocaleLowerCase()) {
+      errors.push("appId only accepts lowercase characters.");
+    }
+    if (!/^[a-z0-9-]*$/.test(id)) {
+      errors.push("appId expects only letters, numbers, and dashes ('-')");
+    }
+
+    if (errors.length > 0) {
+      throw new Error([`appId ${id} has errors:`, ...errors].join("\n"));
+    }
+    return id;
+  }
+}
+
+/**
+ * This is a dummy construct meant to signify that a stack is utilizing
+ * the AppStagingSynthesizer. It does not do anything, and is not meant
+ * to be created on its own. This construct will be a part of the
+ * construct tree only and not the Cfn template. The construct tree is
+ * then encoded in the AWS::CDK::Metadata resource of the stack and
+ * injested in our metrics like every other construct.
+ */
+export class UsingAppStagingSynthesizer extends Construct {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
   }
 }

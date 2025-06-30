@@ -1,12 +1,11 @@
 import * as cdk from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import * as iam from "aws-cdk-lib/aws-iam";
-
 import { Construct } from "constructs";
 
 export interface EC2TesterStackProperties extends cdk.StackProps {
-  readonly vpc: ec2.IVpc;
   readonly endpointSecurityGroup: ec2.ISecurityGroup;
+  readonly vpc: ec2.IVpc;
 }
 /**
  * This stack is used to test the shared VPC. It creates an EC2 instance in the infra VPC only in experimental deployments only.
@@ -26,9 +25,9 @@ export class EC2TesterStack extends cdk.Stack {
     role.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName("PowerUserAccess"));
 
     const sg = new ec2.SecurityGroup(this, "InstanceSecurityGroup", {
-      vpc: vpc,
       allowAllOutbound: true,
-      disableInlineRules: true
+      disableInlineRules: true,
+      vpc: vpc
     });
     sg.addIngressRule(
       ec2.Peer.ipv4(vpc.vpcCidrBlock),
@@ -37,15 +36,15 @@ export class EC2TesterStack extends cdk.Stack {
     );
 
     const instance = new ec2.Instance(this, "TestInstance", {
-      vpc: vpc,
-      vpcSubnets: vpc.selectSubnets({
-        subnetType: ec2.SubnetType.PRIVATE_ISOLATED
-      }),
       instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.MICRO),
       machineImage: ec2.MachineImage.latestAmazonLinux2023(),
       role: role,
       securityGroup: sg,
-      userDataCausesReplacement: true
+      userDataCausesReplacement: true,
+      vpc: vpc,
+      vpcSubnets: vpc.selectSubnets({
+        subnetType: ec2.SubnetType.PRIVATE_ISOLATED
+      })
     });
     instance.connections.allowFrom(properties.endpointSecurityGroup, ec2.Port.tcp(443));
     instance.connections.allowTo(properties.endpointSecurityGroup, ec2.Port.tcp(443));
