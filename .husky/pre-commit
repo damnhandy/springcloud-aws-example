@@ -1,2 +1,1 @@
-#!/bin/sh
-npx pretty-quick --staged
+npm test
