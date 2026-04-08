@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.13.6/.schema/devbox.schema.json",
+  "packages": [
+    "nodejs@22",
+    "python@3.12",
+    "pipenv",
+    "temurin-bin-21@latest",
+    "awscli2",
+    "jq",
+    "uv",
+    "wstunnel"
+  ],
+  "env": {},
+  "shell": {}
+}

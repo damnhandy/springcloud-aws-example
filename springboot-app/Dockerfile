@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi:8.8 as builder
+FROM registry.access.redhat.com/ubi9/ubi:9 as builder
 # We don't use the RedHat JDK distribution as it's not structured as a
 # modular JDK like OpenJDK or OracleJDK
 ENV JVM_VERSION=jdk-17.0.12+7

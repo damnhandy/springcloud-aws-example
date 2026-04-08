@@ -81,9 +81,38 @@ services:
     entrypoint:
       - /flyway-migrate.sh
 
+  wstunnel:
+    container_name: wstunnel
+    #    stdin_open: true
+    #    tty: true
+    build:
+      context: wstunnel
+      dockerfile: Dockerfile
+    mem_reservation: 512M
+    ports:
+      - "8586:8586"
+    secrets:
+      - jdbc_truststore_password
+      - jdbc_truststore_path
+      - source: root_ca
+        target: ca.crt
+        mode: 0600
+      - source: server_cert_wstunnel
+        target: server.crt
+        mode: 0600
+      - source: server_key
+        target: server.key
+        mode: 0600
+    networks:
+      - demo
+    links:
+      - postgres
+    restart: on-failure
+    depends_on:
+      - postgres
   postgres:
     container_name: postgres
-    image: postgres:16
+    image: postgres:18
     user: postgres
     command:
       - "-c"
@@ -152,5 +181,7 @@ secrets:
     file: ./credentials/server.key
   server_cert:
     file: ./credentials/server.crt
+  server_cert_wstunnel:
+    file: ./credentials/server.wstunnel.crt
 networks:
   demo:
